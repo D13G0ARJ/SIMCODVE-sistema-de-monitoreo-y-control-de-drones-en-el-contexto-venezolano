@@ -64,6 +64,7 @@ export default function App() {
   const metricas = snapshot?.metricas || {};
   const eventos = snapshot?.eventos || [];
   const factorSim = snapshot?.config?.factor ?? 1;
+  const pausado = snapshot?.config?.pausado ?? false;
   const enjambre = swarms.find((s) => s.id === enjambreSel);
   const dronVivo = dronSel
     ? snapshot?.drones.find((x) => x.id === dronSel.id)
@@ -105,8 +106,19 @@ export default function App() {
             {CIUDADES.map((c) => <option key={c.nombre} value={c.nombre} />)}
           </datalist>
         </div>
+        <div className="sim-ctrl">
+          <button className={"sim-btn " + (pausado ? "play" : "")} onClick={() => api.setPausa(!pausado)}
+            title={pausado ? "Reanudar" : "Pausar"}>
+            {pausado ? "▶" : "⏸"}
+          </button>
+          <button className="sim-btn" onClick={() => api.reset()} title="Reiniciar simulación">⟳</button>
+          <div className="vel-seg">
+            {VELOCIDADES.map((v) => (
+              <button key={v} className={factorSim === v ? "on" : ""} onClick={() => api.setVelocidad(v)}>{v}x</button>
+            ))}
+          </div>
+        </div>
         <div className="metricas">
-          <Metric label="Velocidad" val={`${factorSim}x`} />
           <Metric label="Enjambres" val={metricas.n_enjambres ?? 0} />
           <Metric label="Unidades" val={metricas.activos ?? 0} />
           <Metric
@@ -143,17 +155,6 @@ export default function App() {
                 {herramienta === "jammer" && "Clic en el mapa para colocar una zona de interferencia."}
               </p>
             )}
-          </Seccion>
-
-          <Seccion titulo="Velocidad de simulación">
-            <div className="modos">
-              {VELOCIDADES.map((v) => (
-                <button key={v} className={"modo " + (factorSim === v ? "on" : "")}
-                  style={{ "--mc": "#34d399" }} onClick={() => api.setVelocidad(v)}>
-                  {v}x
-                </button>
-              ))}
-            </div>
           </Seccion>
 
           {herramienta === "crear" && (
@@ -302,6 +303,7 @@ export default function App() {
             onJammerClick={(id) => setJammerSel(id)}
           />
           {radar && <Radar snapshot={snapshot} />}
+          {pausado && <div className="pausa-ind">⏸ PAUSA</div>}
           <div className="vista-toggle">
             <button className={radar ? "" : "on"} onClick={() => setRadar(false)}>🗺 Mapa</button>
             <button className={radar ? "on" : ""} onClick={() => setRadar(true)}>📡 Radar</button>
@@ -332,7 +334,8 @@ function Leyenda({ swarms }) {
       <strong>Leyenda</strong>
       <div className="ly-fila"><span className="ly-ico" style={{ color: "#fbbf24" }}>⬢</span> Base de operaciones</div>
       <div className="ly-fila"><span className="ly-ico" style={{ color: "#ef4444" }}>▲</span> Dron degradado / interferencia</div>
-      <div className="ly-fila"><span className="ly-linea" /> Enlace mesh</div>
+      <div className="ly-fila"><span className="ly-linea" /> Enlace mesh (mismo enjambre)</div>
+      <div className="ly-fila"><span className="ly-linea blanca" /> Enlace entre enjambres</div>
       <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#ef4444" }} /> Zona de interferencia</div>
       <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#38bdf8", borderStyle: "dashed" }} /> Zona asignada</div>
       {swarms.length > 0 && <div className="ly-sep">Enjambres</div>}

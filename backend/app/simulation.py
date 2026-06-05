@@ -65,6 +65,7 @@ class SimulationEngine:
         self.base = Zone(lat=10.344, lon=-67.041, radio_m=RADIO_BASE_M)
         self.factor = 1.0  # factor de tiempo (1x..8x)
         self.tiempo = 0.0  # tiempo de simulacion acumulado (s), para el barrido
+        self.pausado = False
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
         self._cont_jam = _Contador()
@@ -97,6 +98,27 @@ class SimulationEngine:
     def set_velocidad(self, factor: float) -> None:
         self.factor = max(0.5, min(8.0, factor))
         self._evento("config", f"Velocidad de simulacion: {self.factor:g}x.")
+
+    def set_pausa(self, pausado: bool) -> None:
+        self.pausado = pausado
+        self._evento("config", "Simulacion en pausa." if pausado else "Simulacion reanudada.")
+
+    def reset(self) -> None:
+        """Reinicia toda la simulacion al estado inicial (enjambre demo en la base)."""
+        self.drones.clear()
+        self.swarms.clear()
+        self.jammers.clear()
+        self.eventos.clear()
+        self.base = Zone(lat=10.344, lon=-67.041, radio_m=RADIO_BASE_M)
+        self.factor = 1.0
+        self.tiempo = 0.0
+        self.pausado = False
+        self._cont_drone = _Contador()
+        self._cont_swarm = _Contador()
+        self._cont_jam = _Contador()
+        self._cont_evt = _Contador()
+        self.crear_enjambre(count=8, mode=SwarmMode.PATRULLAJE)
+        self._evento("config", "Simulacion reiniciada.")
 
     # ------------------------------------------------------------------
     # Creacion de enjambres
@@ -320,6 +342,8 @@ class SimulationEngine:
                 )
 
     def _calcular_mesh(self, activos: list[Drone]) -> None:
+        """Red mesh GLOBAL: cualquier dron en rango se enlaza, sin importar el
+        enjambre (modela una red mallada real entre grupos)."""
         for d in activos:
             d.vecinos = []
         for i, a in enumerate(activos):
@@ -327,8 +351,6 @@ class SimulationEngine:
                 continue
             for b in activos[i + 1:]:
                 if b.status == DroneStatus.DEGRADADO:
-                    continue
-                if a.swarm_id != b.swarm_id:
                     continue
                 if distancia_metros(a.lat, a.lon, b.lat, b.lon) <= RANGO_COMUNICACION_M:
                     a.vecinos.append(b.id)
@@ -346,14 +368,17 @@ class SimulationEngine:
                     continue
                 este, norte = offset_metros(d.lat, d.lon, v.lat, v.lon)
                 dist = math.hypot(este, norte) or 1.0
+                # separacion: evitar colision con CUALQUIER dron cercano (otro enjambre incluido)
                 if dist < 120.0:
                     sep_e -= este / dist
                     sep_n -= norte / dist
-                ali_e += v.vx
-                ali_n += v.vy
-                coh_e += este
-                coh_n += norte
-                n_vec += 1
+                # alineacion y cohesion: solo con el PROPIO enjambre (no se mezclan)
+                if v.swarm_id == d.swarm_id:
+                    ali_e += v.vx
+                    ali_n += v.vy
+                    coh_e += este
+                    coh_n += norte
+                    n_vec += 1
             if n_vec:
                 ali_e /= n_vec; ali_n /= n_vec
                 coh_e /= n_vec; coh_n /= n_vec
@@ -368,6 +393,9 @@ class SimulationEngine:
 
             d.vx += ax * dt
             d.vy += ay * dt
+            # suavizado (amortiguamiento) para un vuelo mas estable, menos jitter
+            d.vx *= 0.96
+            d.vy *= 0.96
 
             vmax = VEL_MAX * (0.4 if d.status == DroneStatus.DEGRADADO else 1.0)
             vel = math.hypot(d.vx, d.vy)
@@ -401,10 +429,15 @@ class SimulationEngine:
             r = zona.radio_m * 0.8
             omega = min(OMEGA_PATRULLA, 0.6 * VEL_CRUCERO / max(r, 1.0))
             ang = ang_base + omega * self.tiempo
-        else:  # HIBRIDO: anillo mas cerrado y barrido mas lento (mayor cohesion)
-            r = zona.radio_m * 0.5
-            omega = min(OMEGA_PATRULLA * 0.5, 0.6 * VEL_CRUCERO / max(r, 1.0))
-            ang = ang_base + omega * self.tiempo
+        else:  # HIBRIDO = mezcla real: mitad patrulla (anillo exterior que rota),
+               # mitad defiende (anillo interior estatico)
+            if idx % 2 == 0:
+                r = zona.radio_m * 0.85
+                omega = min(OMEGA_PATRULLA, 0.6 * VEL_CRUCERO / max(r, 1.0))
+                ang = ang_base + omega * self.tiempo
+            else:
+                r = zona.radio_m * 0.4
+                ang = ang_base
 
         # punto objetivo sobre el anillo, relativo al dron = (dron->centro) + (centro->punto)
         objetivo_e = este + math.cos(ang) * r
@@ -436,7 +469,7 @@ class SimulationEngine:
             "jammers": [j.to_dict() for j in self.jammers.values()],
             "base": self.base.to_dict(),
             "eventos": self.eventos[-20:],
-            "config": {"factor": self.factor},
+            "config": {"factor": self.factor, "pausado": self.pausado},
             "metricas": {
                 "total": total,
                 "activos": len(activos),

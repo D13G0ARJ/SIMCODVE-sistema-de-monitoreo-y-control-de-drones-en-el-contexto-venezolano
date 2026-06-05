@@ -117,7 +117,14 @@ export default function MapaTactico({
         dibujados.add(clave);
         const v = porId[vid];
         if (!v) return;
-        L.polyline([[d.lat, d.lon], [v.lat, v.lon]], { color: "#38bdf8", weight: 1, opacity: 0.5, interactive: false }).addTo(mesh);
+        const interEnjambre = v.swarm_id !== d.swarm_id;
+        L.polyline([[d.lat, d.lon], [v.lat, v.lon]], {
+          color: interEnjambre ? "#e2e8f0" : "#38bdf8",   // blanco entre grupos, azul interno
+          weight: 1,
+          opacity: interEnjambre ? 0.55 : 0.45,
+          dashArray: interEnjambre ? "4 5" : null,
+          interactive: false,
+        }).addTo(mesh);
       });
     });
 

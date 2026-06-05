@@ -35,6 +35,8 @@ export const api = {
   quitarJammer: (id) => del(`/api/fallos/jammer/${id}`),
   setBase: (lat, lon) => post("/api/config/base", { lat, lon }),
   setVelocidad: (factor) => post("/api/config/velocidad", { factor }),
+  setPausa: (pausado) => post("/api/config/pausa", { pausado }),
+  reset: () => post("/api/reset"),
 };
 
 // Ciudades de Venezuela para el buscador (vuelo del mapa).

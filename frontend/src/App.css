@@ -47,6 +47,32 @@
 .buscador input::placeholder { color: var(--muted); }
 .buscador input:focus { outline: none; border-color: var(--acc); }
 
+/* Controles de simulacion (barra superior) */
+.sim-ctrl { display: flex; align-items: center; gap: 6px; margin-right: 12px; }
+.sim-btn {
+  width: 34px; height: 34px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--txt);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.sim-btn:hover { border-color: var(--acc); }
+.sim-btn.play { background: #34d399; color: #06223a; border-color: #34d399; }
+.vel-seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.vel-seg button {
+  background: var(--panel2);
+  border: none;
+  border-left: 1px solid var(--line);
+  color: var(--txt);
+  font-size: 11px;
+  padding: 8px 9px;
+  cursor: pointer;
+}
+.vel-seg button:first-child { border-left: none; }
+.vel-seg button.on { background: #34d399; color: #06223a; font-weight: 700; }
+
 .metricas { display: flex; gap: 10px; }
 .metric {
   background: var(--panel2);
@@ -216,6 +242,22 @@
 }
 .vista-toggle button.on { background: var(--acc); color: #06223a; font-weight: 700; }
 
+/* Indicador de pausa */
+.pausa-ind {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1300;
+  background: rgba(245, 158, 11, 0.92);
+  color: #1a1205;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 /* Leyenda */
 .leyenda {
   position: absolute;
@@ -234,6 +276,7 @@
 .ly-fila { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
 .ly-ico { font-size: 13px; width: 14px; text-align: center; }
 .ly-linea { width: 16px; height: 0; border-top: 2px solid #38bdf8; opacity: 0.7; }
+.ly-linea.blanca { border-top: 2px dashed #e2e8f0; }
 .ly-circ { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid; flex-shrink: 0; }
 .ly-sep { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 6px 0 3px; border-top: 1px solid var(--line); padding-top: 5px; }
 .cargando {

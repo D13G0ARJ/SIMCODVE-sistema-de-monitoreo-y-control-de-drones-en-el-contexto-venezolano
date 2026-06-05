@@ -62,7 +62,8 @@ gestor = GestorConexiones()
 
 async def bucle_simulacion() -> None:
     while True:
-        engine.step()
+        if not engine.pausado:
+            engine.step()
         await gestor.difundir(engine.snapshot())
         await asyncio.sleep(DT)
 
@@ -119,6 +120,10 @@ class VelocidadReq(BaseModel):
     factor: float = 1.0
 
 
+class PausaReq(BaseModel):
+    pausado: bool
+
+
 class ZonaReq(BaseModel):
     lat: float
     lon: float
@@ -173,6 +178,18 @@ def set_base(req: BaseReq) -> dict:
 def set_velocidad(req: VelocidadReq) -> dict:
     engine.set_velocidad(req.factor)
     return {"ok": True, "factor": engine.factor}
+
+
+@app.post("/api/config/pausa")
+def set_pausa(req: PausaReq) -> dict:
+    engine.set_pausa(req.pausado)
+    return {"ok": True, "pausado": engine.pausado}
+
+
+@app.post("/api/reset")
+def reset() -> dict:
+    engine.reset()
+    return {"ok": True}
 
 
 @app.post("/api/enjambres")
