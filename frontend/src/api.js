@@ -16,6 +16,21 @@ async function del(path) {
   return r.json();
 }
 
+async function get(path) {
+  const r = await fetch(BASE + path);
+  return r.json();
+}
+
+// Dispara la descarga de un archivo servido por el backend (Content-Disposition).
+function descargar(path) {
+  const a = document.createElement("a");
+  a.href = BASE + path;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 export const api = {
   crearEnjambre: (count, lat, lon, mode, nombre) =>
     post("/api/enjambres", { count, lat, lon, mode, nombre }),
@@ -37,6 +52,13 @@ export const api = {
   setVelocidad: (factor) => post("/api/config/velocidad", { factor }),
   setPausa: (pausado) => post("/api/config/pausa", { pausado }),
   reset: () => post("/api/reset"),
+  // monitoreo / datos / escenarios
+  cobertura: () => get("/api/cobertura"),
+  escenarios: () => get("/api/escenarios"),
+  cargarEscenario: (id) => post(`/api/escenarios/${id}`),
+  exportarHistorial: () => descargar("/api/export/historial.csv"),
+  exportarTelemetria: () => descargar("/api/export/telemetria.csv"),
+  exportarEstado: () => descargar("/api/export/estado.json"),
 };
 
 // Ciudades de Venezuela para el buscador (vuelo del mapa).
@@ -62,7 +84,8 @@ export const CIUDADES = [
 ];
 
 // Mantiene una conexion WebSocket viva y reconecta si se cae.
-export function conectarTelemetria(onSnapshot) {
+// onStatus(bool) notifica el estado del enlace (true = conectado).
+export function conectarTelemetria(onSnapshot, onStatus) {
   let ws;
   let vivo = true;
   let pingTimer;
@@ -71,11 +94,13 @@ export function conectarTelemetria(onSnapshot) {
     ws = new WebSocket(WS);
     ws.onmessage = (e) => onSnapshot(JSON.parse(e.data));
     ws.onopen = () => {
+      onStatus?.(true);
       pingTimer = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send("ping");
       }, 5000);
     };
     ws.onclose = () => {
+      onStatus?.(false);
       clearInterval(pingTimer);
       if (vivo) setTimeout(abrir, 1500);
     };

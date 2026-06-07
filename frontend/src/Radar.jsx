@@ -40,7 +40,11 @@ export default function Radar({ snapshot }) {
       const cx = W / 2, cy = H / 2;
       const R = Math.min(W, H) / 2 - 34;
 
-      ctx.fillStyle = "#04140a";
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) / 1.4);
+      grad.addColorStop(0, "#08251a");
+      grad.addColorStop(0.6, "#051a10");
+      grad.addColorStop(1, "#02100a");
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
 
       if (!snap || !snap.base) {
@@ -117,12 +121,15 @@ export default function Radar({ snapshot }) {
         ctx.fillStyle = `rgba(52,211,153,${0.13 * (1 - k / 28)})`;
         ctx.fill();
       }
-      ctx.strokeStyle = "rgba(110,231,183,0.9)";
+      ctx.shadowColor = "rgba(110,231,183,0.9)";
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = "rgba(160,255,210,0.95)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(Math.cos(theta) * R, Math.sin(theta) * R);
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.lineWidth = 1;
       ctx.restore();
 
@@ -132,11 +139,19 @@ export default function Radar({ snapshot }) {
       pts.forEach(({ este, norte, d }) => {
         const x = cx + este * scale, y = cy - norte * scale;
         const col = d.status === "degradado" ? "#ef4444" : colorEnj[d.swarm_id] || "#34d399";
+        // halo exterior (anillo de sensor)
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.3;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // blip
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, 2 * Math.PI);
         ctx.fillStyle = col;
         ctx.shadowColor = col;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 12;
         ctx.fill();
         ctx.shadowBlur = 0;
       });
