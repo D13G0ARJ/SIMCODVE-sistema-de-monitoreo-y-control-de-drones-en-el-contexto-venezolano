@@ -12,11 +12,16 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import csv
+import io
+import json
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
+from . import escenarios
 from .models import SwarmMode
 from .simulation import DT, SimulationEngine
 
@@ -264,6 +269,72 @@ def quitar_jammer(jammer_id: str) -> dict:
 def actualizar_jammer(jammer_id: str, req: JammerUpdateReq) -> dict:
     engine.actualizar_jammer(jammer_id, req.lat, req.lon, req.radio_m)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Monitoreo: cobertura (M2)
+# ---------------------------------------------------------------------------
+@app.get("/api/cobertura")
+def cobertura() -> dict:
+    return engine.cobertura_geojson()
+
+
+# ---------------------------------------------------------------------------
+# Exportacion de datos para resultados (M3)
+# ---------------------------------------------------------------------------
+def _csv(filas: list[dict], nombre: str) -> Response:
+    buf = io.StringIO()
+    if filas:
+        w = csv.DictWriter(buf, fieldnames=list(filas[0].keys()))
+        w.writeheader()
+        w.writerows(filas)
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@app.get("/api/export/historial.csv")
+def export_historial() -> Response:
+    """Series temporales de metricas muestreadas durante la corrida."""
+    return _csv(engine.historial, "simced_historial.csv")
+
+
+@app.get("/api/export/telemetria.csv")
+def export_telemetria() -> Response:
+    """Telemetria instantanea de todas las unidades."""
+    filas = [d.to_dict() for d in engine.drones.values()]
+    for f in filas:
+        f["vecinos"] = len(f.get("vecinos", []))  # CSV no admite listas
+    return _csv(filas, "simced_telemetria.csv")
+
+
+@app.get("/api/export/estado.json")
+def export_estado() -> Response:
+    """Snapshot completo del estado (incluye metricas y eventos)."""
+    return Response(
+        content=json.dumps(engine.snapshot(), ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="simced_estado.json"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Escenarios precargados (S3)
+# ---------------------------------------------------------------------------
+@app.get("/api/escenarios")
+def listar_escenarios() -> dict:
+    return {"escenarios": escenarios.listar()}
+
+
+@app.post("/api/escenarios/{escenario_id}")
+def cargar_escenario(escenario_id: str) -> dict:
+    spec = escenarios.ESCENARIOS.get(escenario_id)
+    if not spec:
+        raise HTTPException(status_code=404, detail="Escenario no encontrado")
+    engine.cargar_escenario(spec)
+    return {"ok": True, "nombre": spec["nombre"]}
 
 
 @app.get("/")

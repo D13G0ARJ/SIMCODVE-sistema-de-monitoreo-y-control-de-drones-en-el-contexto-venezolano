@@ -21,6 +21,7 @@ import random
 from dataclasses import dataclass
 
 from .models import (
+    METROS_POR_GRADO_LAT,
     Drone,
     DroneStatus,
     Jammer,
@@ -29,6 +30,7 @@ from .models import (
     Zone,
     aplicar_offset,
     distancia_metros,
+    metros_por_grado_lon,
     offset_metros,
 )
 
@@ -42,6 +44,12 @@ RECARGA_BATERIA = 0.6            # % por segundo (en la base)
 UMBRAL_RTB = 20.0                # % de bateria que dispara el retorno automatico
 RADIO_BASE_M = 450.0             # radio de merodeo alrededor de la base
 OMEGA_PATRULLA = 0.12            # velocidad angular del barrido (rad/s)
+
+# Cobertura y resiliencia (objetivos de monitoreo / resiliencia de la tesis)
+GRID_COBERTURA_GRADOS = 0.001    # ~110 m: tamano de celda de la rejilla de cobertura
+UMBRAL_RECUPERACION = 0.92       # fraccion de conectividad previa que marca "reorganizado"
+MUESTREO_HISTORIAL_S = 1.0       # cada cuantos seg de simulacion se guarda una muestra
+MAX_HISTORIAL = 20000            # tope de muestras en memoria
 
 
 @dataclass
@@ -66,6 +74,22 @@ class SimulationEngine:
         self.factor = 1.0  # factor de tiempo (1x..8x)
         self.tiempo = 0.0  # tiempo de simulacion acumulado (s), para el barrido
         self.pausado = False
+        # --- monitoreo / resiliencia ---
+        self.cobertura: dict[tuple[int, int], int] = {}  # celda -> nº de visitas
+        self.historial: list[dict] = []   # series temporales para exportar (M3)
+        self.n_particiones = 1             # islas en el mesh (R2)
+        self.conectividad = 1.0            # frac. del enjambre en el componente mayor
+        self.coherencia = 1.0              # consenso: coherencia circular de rumbo (R=0..1)
+        self.cobertura_pct = 0.0           # % de las zonas asignadas ya visitado (M2)
+        self.n_disrupciones = 0            # eventos disruptivos acumulados (R1)
+        self.t_recuperacion: float | None = None  # ultima recuperacion medida (s)
+        self._t_disrupcion: float | None = None    # instante del ultimo evento disruptivo
+        self._conect_previa: float | None = None    # conectividad antes de la disrupcion
+        self._cayo = False                          # la conectividad llego a caer de verdad
+        self._ultimo_muestreo = 0.0
+        # generador propio sembrable -> corridas reproducibles (escenarios de tesis)
+        self.semilla: int | None = None
+        self._rng = random.Random()
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
         self._cont_jam = _Contador()
@@ -103,8 +127,8 @@ class SimulationEngine:
         self.pausado = pausado
         self._evento("config", "Simulacion en pausa." if pausado else "Simulacion reanudada.")
 
-    def reset(self) -> None:
-        """Reinicia toda la simulacion al estado inicial (enjambre demo en la base)."""
+    def _limpiar(self) -> None:
+        """Vacia todo el estado de la simulacion (sin crear nada)."""
         self.drones.clear()
         self.swarms.clear()
         self.jammers.clear()
@@ -113,12 +137,73 @@ class SimulationEngine:
         self.factor = 1.0
         self.tiempo = 0.0
         self.pausado = False
+        self.cobertura.clear()
+        self.historial.clear()
+        self.n_particiones = 1
+        self.conectividad = 1.0
+        self.coherencia = 1.0
+        self.cobertura_pct = 0.0
+        self.n_disrupciones = 0
+        self.t_recuperacion = None
+        self._t_disrupcion = None
+        self._conect_previa = None
+        self._cayo = False
+        self._ultimo_muestreo = 0.0
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
         self._cont_jam = _Contador()
         self._cont_evt = _Contador()
+
+    def _sembrar(self, semilla: int | None) -> None:
+        """Fija la semilla del generador. Con la misma semilla + escenario, la
+        corrida es bit a bit reproducible (posiciones, rumbos)."""
+        self.semilla = semilla
+        self._rng = random.Random(semilla)
+
+    def reset(self, semilla: int | None = None) -> None:
+        """Reinicia toda la simulacion al estado inicial (enjambre demo en la base).
+        Si se da una semilla, el despliegue es reproducible."""
+        self._limpiar()
+        self._sembrar(semilla)
         self.crear_enjambre(count=8, mode=SwarmMode.PATRULLAJE)
         self._evento("config", "Simulacion reiniciada.")
+
+    # ------------------------------------------------------------------
+    # Escenarios precargados (S3): corridas reproducibles para demo / tesis
+    # ------------------------------------------------------------------
+    def cargar_escenario(self, spec: dict) -> None:
+        """Reconstruye la simulacion desde un escenario declarativo (S3)."""
+        self._limpiar()
+        # semilla del escenario -> corrida reproducible para la demo/tesis
+        self._sembrar(spec.get("seed"))
+        b = spec.get("base")
+        if b:
+            self.base = Zone(lat=b["lat"], lon=b["lon"], radio_m=b.get("radio_m", RADIO_BASE_M))
+        self.factor = max(0.5, min(8.0, float(spec.get("factor", 1.0))))
+
+        for e in spec.get("enjambres", []):
+            modo = SwarmMode(e.get("mode", "patrullaje"))
+            sw = self.crear_enjambre(
+                count=int(e.get("count", 6)),
+                lat=e.get("lat"), lon=e.get("lon"),
+                mode=modo, nombre=e.get("nombre"),
+            )
+            z = e.get("zona")
+            if z:
+                sw.zona = Zone(lat=z["lat"], lon=z["lon"], radio_m=z.get("radio_m", 1500.0))
+
+        for j in spec.get("jammers", []):
+            jid = self._cont_jam.siguiente("JAM")
+            self.jammers[jid] = Jammer(
+                id=jid, lat=j["lat"], lon=j["lon"], radio_m=j.get("radio_m", 1200.0)
+            )
+
+        # si el escenario arranca con interferencia, se cuenta como disrupcion:
+        # asi al retirar el jammer se mide el tiempo de recuperacion (R1)
+        if self.jammers:
+            self._marcar_disrupcion()
+
+        self._evento("escenario", f"Escenario cargado: {spec.get('nombre', 'sin nombre')}.", nivel="warn")
 
     # ------------------------------------------------------------------
     # Creacion de enjambres
@@ -149,11 +234,11 @@ class SimulationEngine:
         for _ in range(count):
             did = self._cont_drone.siguiente("UAV")
             d_lat, d_lon = aplicar_offset(
-                ox, oy, random.uniform(-120, 120), random.uniform(-120, 120)
+                ox, oy, self._rng.uniform(-120, 120), self._rng.uniform(-120, 120)
             )
             self.drones[did] = Drone(
                 id=did, swarm_id=sid, lat=d_lat, lon=d_lon,
-                heading=random.uniform(0, 360), speed=VEL_CRUCERO, mode=mode,
+                heading=self._rng.uniform(0, 360), speed=VEL_CRUCERO, mode=mode,
             )
         self._evento("enjambre", f"{swarm.nombre} desplegado desde la base con {count} unidades en modo {mode.value}.")
         return swarm
@@ -254,15 +339,25 @@ class SimulationEngine:
     def eliminar_nodo(self, drone_id: str) -> None:
         d = self.drones.get(drone_id)
         if d and d.status != DroneStatus.PERDIDO:
+            self._marcar_disrupcion()
             d.status = DroneStatus.PERDIDO
             self._evento("fallo", f"Nodo {drone_id} eliminado. El enjambre se reorganiza.", nivel="error")
 
     def crear_jammer(self, lat: float, lon: float, radio_m: float = 1200.0) -> Jammer:
+        self._marcar_disrupcion()
         jid = self._cont_jam.siguiente("JAM")
         jam = Jammer(id=jid, lat=lat, lon=lon, radio_m=radio_m)
         self.jammers[jid] = jam
         self._evento("fallo", f"Zona de interferencia {jid} activada.", nivel="error")
         return jam
+
+    def _marcar_disrupcion(self) -> None:
+        """Registra un evento disruptivo y guarda la conectividad previa para
+        medir luego el tiempo de recuperacion (R1)."""
+        self._t_disrupcion = self.tiempo
+        self._conect_previa = self.conectividad
+        self._cayo = False
+        self.n_disrupciones += 1
 
     def quitar_jammer(self, jammer_id: str) -> None:
         if jammer_id in self.jammers:
@@ -309,12 +404,16 @@ class SimulationEngine:
                 d.senal = min(100.0, d.senal + 6.0)
 
         self._calcular_mesh(activos)
+        self._calcular_particiones(activos)  # R2: islas / conectividad
 
         # 2) mover cada enjambre segun su modo
         for sw in self.swarms.values():
             miembros = [d for d in activos if d.swarm_id == sw.id]
             if miembros:
                 self._mover_enjambre(sw, miembros, dt)
+
+        self._calcular_consenso(activos)     # consenso: coherencia de rumbo
+        self._registrar_cobertura(activos)   # M2: rejilla de cobertura
 
         # 3) telemetria: bateria (se recarga en la base sin mision; si no, descarga)
         for d in activos:
@@ -341,6 +440,10 @@ class SimulationEngine:
                     nivel="warn",
                 )
 
+        # 5) monitoreo / resiliencia: recuperacion y muestreo de metricas
+        self._evaluar_recuperacion()  # R1
+        self._muestrear_historial()   # M3
+
     def _calcular_mesh(self, activos: list[Drone]) -> None:
         """Red mesh GLOBAL: cualquier dron en rango se enlaza, sin importar el
         enjambre (modela una red mallada real entre grupos)."""
@@ -355,6 +458,139 @@ class SimulationEngine:
                 if distancia_metros(a.lat, a.lon, b.lat, b.lon) <= RANGO_COMUNICACION_M:
                     a.vecinos.append(b.id)
                     b.vecinos.append(a.id)
+
+    def _calcular_particiones(self, activos: list[Drone]) -> None:
+        """Componentes conexas del mesh (union-find). Reporta el nº de islas y la
+        conectividad = fraccion de drones en el componente mayor. Un dron en zona
+        de interferencia (DEGRADADO) no tiene enlaces -> queda aislado, lo que
+        modela la perdida de cobertura de red (R2)."""
+        if not activos:
+            self.n_particiones = 0
+            self.conectividad = 1.0
+            return
+        padre = {d.id: d.id for d in activos}
+
+        def raiz(x: str) -> str:
+            while padre[x] != x:
+                padre[x] = padre[padre[x]]
+                x = padre[x]
+            return x
+
+        for d in activos:
+            for vid in d.vecinos:
+                if vid in padre:
+                    ra, rb = raiz(d.id), raiz(vid)
+                    if ra != rb:
+                        padre[ra] = rb
+
+        tam: dict[str, int] = {}
+        for d in activos:
+            r = raiz(d.id)
+            tam[r] = tam.get(r, 0) + 1
+        self.n_particiones = len(tam)
+        self.conectividad = max(tam.values()) / len(activos)
+
+    def _calcular_consenso(self, activos: list[Drone]) -> None:
+        """Consenso de rumbo descentralizado: coherencia circular R por enjambre,
+        promediada. R = |media(e^{i·rumbo})| en [0,1]; 1 = todos alineados, 0 =
+        rumbos dispersos. Mide cuanto converge la alineacion del enjambre (Boids +
+        consenso promedio sobre vecinos) sin nodo central -> objetivo de tesis."""
+        por_sw: dict[str, list[Drone]] = {}
+        for d in activos:
+            por_sw.setdefault(d.swarm_id, []).append(d)
+        if not por_sw:
+            self.coherencia = 1.0
+            return
+        cohs: list[float] = []
+        for ms in por_sw.values():
+            if len(ms) < 2:
+                cohs.append(1.0)
+                continue
+            sx = sum(math.cos(math.radians(d.heading)) for d in ms)
+            sy = sum(math.sin(math.radians(d.heading)) for d in ms)
+            cohs.append(math.hypot(sx, sy) / len(ms))
+        self.coherencia = sum(cohs) / len(cohs)
+
+    def _calcular_cobertura_pct(self) -> None:
+        """Eficacia de cobertura: fraccion de las celdas DENTRO de las zonas
+        asignadas que ya fueron visitadas al menos una vez. Mide que tan bien el
+        patrullaje barre el area encomendada (M2). Costoso -> se evalua al
+        muestrear (1 Hz), no en cada paso."""
+        objetivo: set[tuple[int, int]] = set()
+        paso = GRID_COBERTURA_GRADOS
+        for sw in self.swarms.values():
+            z = sw.zona
+            if not z:
+                continue
+            dlat = z.radio_m / METROS_POR_GRADO_LAT
+            dlon = z.radio_m / metros_por_grado_lon(z.lat)
+            gy0, gy1 = int((z.lat - dlat) / paso), int((z.lat + dlat) / paso)
+            gx0, gx1 = int((z.lon - dlon) / paso), int((z.lon + dlon) / paso)
+            for gy in range(gy0, gy1 + 1):
+                for gx in range(gx0, gx1 + 1):
+                    clat, clon = (gy + 0.5) * paso, (gx + 0.5) * paso
+                    if distancia_metros(clat, clon, z.lat, z.lon) <= z.radio_m:
+                        objetivo.add((gy, gx))
+        if not objetivo:
+            self.cobertura_pct = 0.0
+            return
+        cubiertas = sum(1 for c in objetivo if c in self.cobertura)
+        self.cobertura_pct = 100.0 * cubiertas / len(objetivo)
+
+    def _registrar_cobertura(self, activos: list[Drone]) -> None:
+        """Acumula la presencia de drones en una rejilla geografica (M2)."""
+        for d in activos:
+            celda = (
+                int(d.lat / GRID_COBERTURA_GRADOS),
+                int(d.lon / GRID_COBERTURA_GRADOS),
+            )
+            self.cobertura[celda] = self.cobertura.get(celda, 0) + 1
+
+    def _evaluar_recuperacion(self) -> None:
+        """Si hubo una disrupcion, mide cuanto tarda la conectividad en volver al
+        umbral de la conectividad previa -> tiempo de recuperacion (R1)."""
+        if self._t_disrupcion is None:
+            return
+        objetivo = (self._conect_previa or 1.0) * UMBRAL_RECUPERACION
+        if self.conectividad < objetivo:
+            self._cayo = True   # la perturbacion si afecto la red
+            return
+        # conectividad por encima del umbral: solo cuenta como recuperacion si
+        # antes hubo una caida real (evita medir 0s en perturbaciones sin efecto)
+        if self._cayo:
+            self.t_recuperacion = round(self.tiempo - self._t_disrupcion, 1)
+            self._evento(
+                "resiliencia",
+                f"Red reorganizada en {self.t_recuperacion}s tras la perturbacion.",
+            )
+        self._t_disrupcion = None
+        self._conect_previa = None
+        self._cayo = False
+
+    def _muestrear_historial(self) -> None:
+        """Guarda una muestra de metricas cada MUESTREO_HISTORIAL_S (M3)."""
+        if self.tiempo - self._ultimo_muestreo < MUESTREO_HISTORIAL_S:
+            return
+        self._ultimo_muestreo = self.tiempo
+        self._calcular_cobertura_pct()   # eficacia de cobertura (costoso: 1 Hz)
+        activos = [d for d in self.drones.values() if d.status != DroneStatus.PERDIDO]
+        operativos = [d for d in activos if d.status == DroneStatus.ACTIVO]
+        total = len(self.drones)
+        self.historial.append({
+            "t": round(self.tiempo, 1),
+            "total": total,
+            "activos": len(activos),
+            "operativos": len(operativos),
+            "pct_operativo": round(100.0 * len(operativos) / total, 1) if total else 0.0,
+            "n_enjambres": len(self.swarms),
+            "n_particiones": self.n_particiones,
+            "conectividad": round(self.conectividad, 3),
+            "coherencia": round(self.coherencia, 3),
+            "cobertura_pct": round(self.cobertura_pct, 1),
+            "celdas_cubiertas": len(self.cobertura),
+        })
+        if len(self.historial) > MAX_HISTORIAL:
+            self.historial = self.historial[-MAX_HISTORIAL:]
 
     def _mover_enjambre(self, sw: Swarm, miembros: list[Drone], dt: float) -> None:
         # objetivo: la zona asignada, o la base si aun no hay mision (merodeo)
@@ -476,5 +712,28 @@ class SimulationEngine:
                 "operativos": len(operativos),
                 "pct_operativo": pct,
                 "n_enjambres": len(self.swarms),
+                "n_particiones": self.n_particiones,
+                "conectividad": round(100.0 * self.conectividad, 1),
+                "coherencia": round(100.0 * self.coherencia, 1),
+                "cobertura_pct": round(self.cobertura_pct, 1),
+                "n_disrupciones": self.n_disrupciones,
+                "t_recuperacion": self.t_recuperacion,
+                "celdas_cubiertas": len(self.cobertura),
+                "semilla": self.semilla,
             },
         }
+
+    def cobertura_geojson(self) -> dict:
+        """Rejilla de cobertura como lista de celdas {lat, lon, n} para el overlay (M2)."""
+        if not self.cobertura:
+            return {"paso": GRID_COBERTURA_GRADOS, "max": 0, "celdas": []}
+        mx = max(self.cobertura.values())
+        celdas = [
+            {
+                "lat": round((gy + 0.5) * GRID_COBERTURA_GRADOS, 6),
+                "lon": round((gx + 0.5) * GRID_COBERTURA_GRADOS, 6),
+                "n": n,
+            }
+            for (gy, gx), n in self.cobertura.items()
+        ]
+        return {"paso": GRID_COBERTURA_GRADOS, "max": mx, "celdas": celdas}
