@@ -1,0 +1,95 @@
+@startuml clases
+title Figura 6.5 - Diagrama de clases - SIMCODVE
+skinparam shadowing false
+skinparam defaultFontName Arial
+hide circle
+
+class ConfiguracionSistema {
+  + factor_velocidad : float
+  + pausado : bool
+  + parametros : dict
+}
+
+class Escenario {
+  + id : str
+  + nombre : str
+  + semilla : int
+  + base : Waypoint
+  + construir()
+}
+
+class MotorSimulacion {
+  + tiempo : float
+  + paso()
+  + iniciar()
+  + pausar()
+  + reiniciar()
+  + snapshot()
+}
+
+class Enjambre {
+  + id : str
+  + nombre : str
+  + modo : str
+  + zona : Waypoint
+}
+
+class DronSimulado {
+  + id : str
+  + estado : str
+  + modo : str
+  + actualizar()
+}
+
+class Telemetria {
+  + lat : float
+  + lon : float
+  + altitud : float
+  + velocidad : float
+  + bateria : float
+  + senal : float
+}
+
+class Waypoint {
+  + lat : float
+  + lon : float
+}
+
+class Trayectoria {
+  + agregar(Waypoint)
+}
+
+class Alerta {
+  + tipo : str
+  + nivel : str
+  + mensaje : str
+}
+
+class GestorAlertas {
+  + generar(Alerta)
+  + listar()
+}
+
+class GestorMetricas {
+  + registrar()
+  + historial : list
+  + exportar_csv()
+}
+
+class RadarView {
+  + render()
+}
+
+ConfiguracionSistema --> MotorSimulacion
+MotorSimulacion --> Escenario : carga
+MotorSimulacion "1" o-- "*" Enjambre
+MotorSimulacion "1" o-- "*" DronSimulado
+Enjambre "1" o-- "*" DronSimulado
+DronSimulado "1" --> "1" Telemetria
+DronSimulado "1" --> "1" Trayectoria
+Trayectoria "1" o-- "*" Waypoint
+MotorSimulacion --> GestorAlertas
+MotorSimulacion --> GestorMetricas
+GestorAlertas "1" o-- "*" Alerta
+RadarView ..> MotorSimulacion : observa (snapshot)
+@enduml

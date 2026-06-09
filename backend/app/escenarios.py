@@ -1,80 +1,80 @@
 """
-Escenarios precargados de SIMCED (S3).
+Escenarios predefinidos de SIMCODVE (declarativos y reproducibles).
 
-Cada escenario es una especificacion declarativa que el motor reconstruye con
-SimulationEngine.cargar_escenario(). Sirven para demostraciones reproducibles
-durante la defensa y para generar datos comparables entre corridas.
+Cada escenario describe la base, los enjambres (con su modo y zona) y las zonas
+de interferencia. Se cargan con engine.cargar_escenario(id) y, gracias a la
+semilla, se reproducen igual en cada corrida (util para el Capitulo IV).
 
-Coordenadas reales de Venezuela (zona de los Altos Mirandinos / centro-norte).
-Todos los datos son sinteticos: no hay drones ni RF reales.
+Coordenadas APROXIMADAS de instituciones venezolanas (faciles de ajustar):
+  - UNEFA Nucleo Altos Mirandinos (Los Teques)
+  - UNES  (Universidad Nacional Experimental de la Seguridad, Caracas)
+  - UNETRANS (Universidad Nacional Experimental del Transporte, Caracas)
 """
-from __future__ import annotations
 
-# id -> especificacion del escenario
+UNEFA = {"lat": 10.34915, "lon": -67.02262}          # real (OpenStreetMap)
+HOSPITAL_VS = {"lat": 10.35411, "lon": -67.03655}    # Hospital Victorino Santaella, Los Teques (real)
+FUERTE_TIUNA = {"lat": 10.43700, "lon": -66.91072}   # Fuerte Tiuna, Caracas (real)
+
 ESCENARIOS: dict[str, dict] = {
+    # 1) El bueno: patrullaje urbano sobre Los Teques.
     "patrullaje_urbano": {
         "nombre": "Patrullaje urbano — Los Teques",
-        "descripcion": "Un enjambre barre en patrullaje una zona urbana desde la base.",
+        "descripcion": "Un enjambre patrulla en barrido el casco urbano de Los Teques.",
+        "seed": 1,
         "base": {"lat": 10.344, "lon": -67.041},
-        "factor": 2.0,
-        "seed": 101,
-        "enjambres": [
-            {
-                "nombre": "Patrulla Norte", "count": 8, "mode": "patrullaje",
-                "zona": {"lat": 10.355, "lon": -67.028, "radio_m": 1600.0},
-            },
+        "swarms": [
+            {"count": 8, "mode": "patrullaje", "nombre": "Patrulla Los Teques",
+             "zona": {"lat": 10.3505, "lon": -67.0335, "radio_m": 1600}},
         ],
         "jammers": [],
     },
-    "defensa_instalacion": {
-        "nombre": "Defensa de instalación",
-        "descripcion": "Un enjambre forma un anillo perimetral estatico alrededor de un punto critico.",
+
+    # 2) Defensa de instalacion -> la UNEFA (perimetro cerrado sobre el campus).
+    "defensa_unefa": {
+        "nombre": "Defensa de instalación — UNEFA",
+        "descripcion": "El enjambre forma un perímetro defensivo sobre el campus de la UNEFA.",
+        "seed": 2,
         "base": {"lat": 10.344, "lon": -67.041},
-        "factor": 2.0,
-        "seed": 202,
-        "enjambres": [
-            {
-                "nombre": "Anillo Defensivo", "count": 10, "mode": "defensa",
-                "zona": {"lat": 10.330, "lon": -67.050, "radio_m": 1200.0},
-            },
+        "swarms": [
+            {"count": 8, "mode": "defensa", "nombre": "Defensa UNEFA",
+             "zona": {"lat": UNEFA["lat"], "lon": UNEFA["lon"], "radio_m": 850}},
         ],
         "jammers": [],
     },
+
+    # 3) Resiliencia bajo interferencia: el jammer cubre PARTE de la zona y el
+    #    enjambre la rodea/evita, manteniendo la vigilancia del resto (resolucion).
     "resiliencia_interferencia": {
+        "oculto": True,   # no se muestra en el listado (se puede reactivar quitando esto)
         "nombre": "Resiliencia bajo interferencia",
-        "descripcion": "Enjambre en patrullaje con una zona de interferencia activa sobre la mision: muestra degradacion y recuperacion.",
+        "descripcion": "Una interferencia cubre parte de la zona; el enjambre la evita "
+                       "y sigue patrullando el área libre (resiliencia).",
+        "seed": 3,
         "base": {"lat": 10.344, "lon": -67.041},
-        "factor": 2.0,
-        "seed": 303,
-        "enjambres": [
-            {
-                "nombre": "Patrulla Resiliente", "count": 9, "mode": "hibrido",
-                "zona": {"lat": 10.358, "lon": -67.020, "radio_m": 1700.0},
-            },
+        "swarms": [
+            {"count": 9, "mode": "patrullaje", "nombre": "Patrulla resiliente",
+             "zona": {"lat": 10.3520, "lon": -67.0280, "radio_m": 1600}},
         ],
         "jammers": [
-            {"lat": 10.358, "lon": -67.020, "radio_m": 3000.0},
+            {"lat": 10.3560, "lon": -67.0205, "radio_m": 800},
         ],
     },
+
+    # 4) Operacion multienjambre -> tres puntos: UNEFA Los Teques, Hospital
+    #    Victorino Santaella y Fuerte Tiuna.
     "operacion_multienjambre": {
-        "nombre": "Operación multi-enjambre",
-        "descripcion": "Tres enjambres en zonas y modos distintos coordinados por la red mesh global.",
-        "base": {"lat": 10.344, "lon": -67.041},
-        "factor": 4.0,
-        "seed": 404,
-        "enjambres": [
-            {
-                "nombre": "Alfa (patrullaje)", "count": 7, "mode": "patrullaje",
-                "zona": {"lat": 10.360, "lon": -67.010, "radio_m": 1500.0},
-            },
-            {
-                "nombre": "Bravo (defensa)", "count": 7, "mode": "defensa",
-                "zona": {"lat": 10.320, "lon": -67.060, "radio_m": 1300.0},
-            },
-            {
-                "nombre": "Charlie (híbrido)", "count": 7, "mode": "hibrido",
-                "zona": {"lat": 10.335, "lon": -67.005, "radio_m": 1600.0},
-            },
+        "nombre": "Operación multienjambre — UNEFA · Hospital V. Santaella · Fuerte Tiuna",
+        "descripcion": "Tres enjambres supervisan simultáneamente la UNEFA Los Teques, "
+                       "el Hospital Victorino Santaella y el Fuerte Tiuna.",
+        "seed": 4,
+        "base": {"lat": 10.385, "lon": -66.985},
+        "swarms": [
+            {"count": 6, "mode": "patrullaje", "nombre": "Enjambre UNEFA",
+             "zona": {"lat": UNEFA["lat"], "lon": UNEFA["lon"], "radio_m": 1200}},
+            {"count": 6, "mode": "hibrido", "nombre": "Enjambre Hospital V. Santaella",
+             "zona": {"lat": HOSPITAL_VS["lat"], "lon": HOSPITAL_VS["lon"], "radio_m": 1000}},
+            {"count": 6, "mode": "defensa", "nombre": "Enjambre Fuerte Tiuna",
+             "zona": {"lat": FUERTE_TIUNA["lat"], "lon": FUERTE_TIUNA["lon"], "radio_m": 1200}},
         ],
         "jammers": [],
     },
@@ -82,8 +82,9 @@ ESCENARIOS: dict[str, dict] = {
 
 
 def listar() -> list[dict]:
-    """Resumen de escenarios disponibles para el selector del frontend."""
+    """Lista resumida de escenarios visibles para el frontend (omite los ocultos)."""
     return [
         {"id": k, "nombre": v["nombre"], "descripcion": v["descripcion"]}
         for k, v in ESCENARIOS.items()
+        if not v.get("oculto")
     ]

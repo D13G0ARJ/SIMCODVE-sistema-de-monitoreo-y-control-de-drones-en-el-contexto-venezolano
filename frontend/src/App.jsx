@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import MapaTactico from "./MapaTactico";
 import Radar from "./Radar";
-import { api, conectarTelemetria, MODOS, CIUDADES } from "./api";
+import Buscador from "./Buscador";
+import ModalEscenarios from "./ModalEscenarios";
+import PantallaCarga from "./PantallaCarga";
+import AnimacionModo from "./AnimacionModo";
+import { api, conectarTelemetria, listarEscenarios, MODOS } from "./api";
 import "./App.css";
+import "./tactical.css";
 
 // Venezuela (para el boton "Ver Venezuela")
 const VENEZUELA_BOUNDS = [
   [0.6, -73.4],
   [12.5, -59.8],
 ];
-const VELOCIDADES = [1, 2, 4, 8];
+const VELOCIDADES = [1, 2, 4, 8, 16, 32];
 
 export default function App() {
   const [snapshot, setSnapshot] = useState(null);
@@ -21,32 +26,17 @@ export default function App() {
   const [radar, setRadar] = useState(false);
   const [jammerSel, setJammerSel] = useState(null);
   const [escenarios, setEscenarios] = useState([]);
-  const [verCobertura, setVerCobertura] = useState(false);
-  const [cobertura, setCobertura] = useState(null);
-  const [conectado, setConectado] = useState(false);
-  const [leyendaAbierta, setLeyendaAbierta] = useState(true);
+  const [modalEsc, setModalEsc] = useState(false);
+  const [cargandoEsc, setCargandoEsc] = useState(null); // nombre del escenario en carga
+  const [unirSel, setUnirSel] = useState([]);           // ids de enjambres a unir
+  const [animModo, setAnimModo] = useState(null);       // animación de cambio de modo
   const herramientaRef = useRef(herramienta);
   herramientaRef.current = herramienta;
   const selRef = useRef({ enjambreSel, modoNuevo, conteoNuevo });
   selRef.current = { enjambreSel, modoNuevo, conteoNuevo };
 
-  useEffect(() => conectarTelemetria(setSnapshot, setConectado), []);
-
-  // catalogo de escenarios precargados (S3)
-  useEffect(() => {
-    api.escenarios().then((r) => setEscenarios(r.escenarios || [])).catch(() => {});
-  }, []);
-
-  // sondea la rejilla de cobertura mientras el heatmap este activo (M2)
-  useEffect(() => {
-    if (!verCobertura) return;
-    let vivo = true;
-    const tick = () =>
-      api.cobertura().then((c) => { if (vivo) setCobertura(c); }).catch(() => {});
-    tick();
-    const t = setInterval(tick, 2000);
-    return () => { vivo = false; clearInterval(t); setCobertura(null); };
-  }, [verCobertura]);
+  useEffect(() => conectarTelemetria(setSnapshot), []);
+  useEffect(() => { listarEscenarios().then(setEscenarios).catch(() => {}); }, []);
 
   // primer enjambre seleccionado por defecto
   useEffect(() => {
@@ -69,16 +59,26 @@ export default function App() {
     }
   }
 
-  function buscarCiudad(texto) {
-    const c = CIUDADES.find(
-      (x) => x.nombre.toLowerCase() === texto.trim().toLowerCase()
-    );
-    if (c) window.__simcedMap?.flyTo([c.lat, c.lon], 13);
-  }
 
   function onDronClick(d) {
     setDronSel(d);
     setEnjambreSel(d.swarm_id);
+  }
+
+  function lanzarEscenario(e) {
+    setModalEsc(false);
+    setCargandoEsc(e.nombre);
+    api.cargarEscenario(e.id); // el escenario se carga ya; la pantalla es el "show"
+  }
+
+  function toggleUnir(id) {
+    setUnirSel((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  }
+
+  function cambiarModo(sw, m) {
+    setAnimModo({ label: m.label, color: m.color, nombre: sw.nombre });
+    api.setModo(sw.id, m.id);
+    setTimeout(() => setAnimModo(null), 1700);
   }
 
   const swarms = snapshot?.swarms || [];
@@ -112,25 +112,11 @@ export default function App() {
         <div className="marca">
           <span className="logo">◎</span>
           <div>
-            <strong>SIMCED</strong>
-            <small>Simulación · Monitoreo · Control de Enjambres</small>
+            <strong>SIMCODVE</strong>
+            <small>Sistema de Monitoreo y Control de Drones · Contexto Venezolano</small>
           </div>
         </div>
-        <div className={"enlace " + (conectado ? "on" : "off")}>
-          <span className="enlace-led" />
-          {conectado ? "Telemetría activa" : "Sin enlace"}
-        </div>
-        <div className="buscador">
-          <input
-            list="ciudades"
-            placeholder="Ir a ciudad — ej. Caracas"
-            onChange={(e) => buscarCiudad(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") buscarCiudad(e.target.value); }}
-          />
-          <datalist id="ciudades">
-            {CIUDADES.map((c) => <option key={c.nombre} value={c.nombre} />)}
-          </datalist>
-        </div>
+        <Buscador />
         <div className="sim-ctrl">
           <button className={"sim-btn " + (pausado ? "play" : "")} onClick={() => api.setPausa(!pausado)}
             title={pausado ? "Reanudar" : "Pausar"}>
@@ -143,28 +129,19 @@ export default function App() {
             ))}
           </div>
         </div>
+        <div className="metricas">
+          <Metric label="Enjambres" val={metricas.n_enjambres ?? 0} />
+          <Metric label="Unidades" val={metricas.activos ?? 0} />
+          <Metric
+            label="Operativo"
+            val={`${metricas.pct_operativo ?? 0}%`}
+            warn={(metricas.pct_operativo ?? 100) < 70}
+          />
+        </div>
       </header>
 
-      <div className="metric-strip">
-        <Metric label="Enjambres" val={metricas.n_enjambres ?? 0} />
-        <Metric label="Unidades" val={metricas.activos ?? 0} />
-        <Metric label="Operativo" val={`${metricas.pct_operativo ?? 0}%`}
-          warn={(metricas.pct_operativo ?? 100) < 70} />
-        <Metric label="Conectividad" val={`${metricas.conectividad ?? 100}%`}
-          warn={(metricas.conectividad ?? 100) < 70} />
-        <Metric label="Consenso" val={`${metricas.coherencia ?? 100}%`}
-          warn={(metricas.coherencia ?? 100) < 50} />
-        <Metric label="Particiones" val={metricas.n_particiones ?? 1}
-          warn={(metricas.n_particiones ?? 1) > 1} />
-        <Metric label="Disrupciones" val={metricas.n_disrupciones ?? 0} />
-        <Metric label="Recuperación"
-          val={metricas.t_recuperacion != null ? `${metricas.t_recuperacion}s` : "—"} />
-        <Metric label="Cobertura zona" val={`${metricas.cobertura_pct ?? 0}%`} />
-        <Metric label="Celdas" val={metricas.celdas_cubiertas ?? 0} />
-      </div>
-
       <div className="cuerpo">
-        <aside className="rail rail-left">
+        <aside className="panel">
           <Seccion titulo="Herramientas">
             <div className="grid2">
               <Boton act={herramienta === "crear"} onClick={() => setHerramienta(herramienta === "crear" ? "normal" : "crear")}>
@@ -180,7 +157,7 @@ export default function App() {
                 ⚡ Interferencia
               </Boton>
               <Boton onClick={verVenezuela}>🗺 Ver Venezuela</Boton>
-              <Boton onClick={centrarBase}>⊙ Ir a la base</Boton>
+              <Boton onClick={centrarBase}>⊙ Ver base</Boton>
             </div>
             {herramienta !== "normal" && herramienta !== "crear" && (
               <p className="ayuda">
@@ -190,20 +167,6 @@ export default function App() {
               </p>
             )}
           </Seccion>
-
-          {escenarios.length > 0 && (
-            <Seccion titulo="Escenarios">
-              <div className="escenarios">
-                {escenarios.map((e) => (
-                  <button key={e.id} className="escenario" title={e.descripcion}
-                    onClick={() => api.cargarEscenario(e.id)}>
-                    {e.nombre}
-                  </button>
-                ))}
-              </div>
-              <p className="ayuda">Carga una configuración predefinida (base, enjambres, zonas e interferencias) para una demostración reproducible.</p>
-            </Seccion>
-          )}
 
           {herramienta === "crear" && (
             <Seccion titulo="Nuevo enjambre">
@@ -231,11 +194,23 @@ export default function App() {
             </Seccion>
           )}
 
+          <button className="btn-escenarios" onClick={() => setModalEsc(true)}>
+            <span className="be-ico">⊞</span>
+            <span className="be-txt">
+              <strong>Escenarios preconfigurados</strong>
+              <small>Operaciones tácticas listas para desplegar</small>
+            </span>
+            <span className="be-arrow">→</span>
+          </button>
+
           <Seccion titulo="Enjambres">
             {swarms.length === 0 && <p className="vacio">Sin enjambres desplegados.</p>}
             {swarms.map((s) => (
               <div key={s.id} className={"enjambre " + (enjambreSel === s.id ? "sel" : "")}
                 onClick={() => { setEnjambreSel(s.id); setDronSel(null); }}>
+                <input type="checkbox" className="enj-check" checked={unirSel.includes(s.id)}
+                  onClick={(e) => e.stopPropagation()} onChange={() => toggleUnir(s.id)}
+                  title="Marcar para unir" />
                 <span className="punto" style={{ background: s.color }} />
                 <div className="enj-info">
                   <strong>{s.nombre}</strong>
@@ -243,27 +218,86 @@ export default function App() {
                 </div>
               </div>
             ))}
+            {unirSel.length >= 2 && (
+              <Boton act onClick={async () => { await api.unir(unirSel); setUnirSel([]); }}>
+                ⤝ Unir {unirSel.length} enjambres
+              </Boton>
+            )}
           </Seccion>
 
-          <Seccion titulo="Monitoreo y datos">
-            <Boton act={verCobertura} onClick={() => setVerCobertura((v) => !v)}>
-              {verCobertura ? "◼ Ocultar cobertura" : "▦ Heatmap de cobertura"}
-            </Boton>
-            <span className="etq" style={{ marginTop: 10 }}>Exportar resultados</span>
-            <div className="grid2">
-              <Boton onClick={() => api.exportarHistorial()}>⭳ Historial CSV</Boton>
-              <Boton onClick={() => api.exportarTelemetria()}>⭳ Telemetría CSV</Boton>
-              <Boton onClick={() => api.exportarEstado()}>⭳ Estado JSON</Boton>
-            </div>
-            <p className="ayuda">El historial registra series temporales (operativo, conectividad, particiones, cobertura) para el análisis de resultados.</p>
-          </Seccion>
+          {enjambre && (
+            <Seccion titulo={`Control · ${enjambre.nombre}`}>
+              <span className="etq">Modo operativo</span>
+              <div className="modos">
+                {MODOS.map((m) => (
+                  <button key={m.id} className={"modo " + (enjambre.mode === m.id ? "on" : "")}
+                    style={{ "--mc": m.color }} onClick={() => cambiarModo(enjambre, m)}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid2" style={{ marginTop: 8 }}>
+                <Boton onClick={() => api.dividir(enjambre.id, 2)} disabled={enjambre.n_miembros < 2}>
+                  ⋔ Dividir en 2
+                </Boton>
+                <Boton onClick={() => api.dividir(enjambre.id, 3)} disabled={enjambre.n_miembros < 3}>
+                  ⋔ Dividir en 3
+                </Boton>
+                <Boton onClick={centrarEnjambre}>⊙ Centrar</Boton>
+                <Boton onClick={() => api.retornarBase(enjambre.id)} disabled={!enjambre.zona}>
+                  🏠 Ir a base
+                </Boton>
+              </div>
+              {enjambre.zona && (
+                <label className="campo" style={{ marginTop: 10 }}>
+                  Radio de zona: {Math.round(enjambre.zona.radio_m)} m
+                  <input type="range" min="500" max="5000" step="100"
+                    value={enjambre.zona.radio_m}
+                    onChange={(e) => api.setRadio(enjambre.id, +e.target.value)} />
+                </label>
+              )}
+              <p className="ayuda">Marca varios enjambres (☑) en la lista para unirlos; “Dividir” los separa.</p>
+            </Seccion>
+          )}
+
+          {jammerVivo && (
+            <Seccion titulo={`Interferencia ${jammerVivo.id}`}>
+              <label className="campo">
+                Radio: {Math.round(jammerVivo.radio_m)} m
+                <input type="range" min="300" max="4000" step="100"
+                  value={jammerVivo.radio_m}
+                  onChange={(e) => api.actualizarJammer(jammerVivo.id, { radio_m: +e.target.value })} />
+              </label>
+              <p className="ayuda">Arrastra el ✛ en el mapa para moverla.</p>
+              <Boton danger onClick={() => { api.quitarJammer(jammerVivo.id); setJammerSel(null); }}>
+                ✕ Quitar interferencia
+              </Boton>
+            </Seccion>
+          )}
+
+          {dronVivo && (
+            <Seccion titulo={`Unidad ${dronVivo.id}`}>
+              <Telemetria d={dronVivo} />
+              <span className="etq">Modo de la unidad</span>
+              <div className="modos">
+                {MODOS.map((m) => (
+                  <button key={m.id} className={"modo " + (dronVivo.mode === m.id ? "on" : "")}
+                    style={{ "--mc": m.color }} onClick={() => api.setModoDron(dronVivo.id, m.id)}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <Boton danger onClick={() => { api.eliminarNodo(dronVivo.id); setDronSel(null); }}>
+                ✕ Eliminar nodo (simular pérdida)
+              </Boton>
+            </Seccion>
+          )}
         </aside>
 
         <main className="mapa-wrap">
           <MapaTactico
             snapshot={snapshot}
             herramienta={herramienta}
-            cobertura={verCobertura ? cobertura : null}
             onMapClick={onMapClick}
             onDronClick={onDronClick}
             onZonaMove={(id, lat, lon) => api.moverZona(id, lat, lon)}
@@ -273,150 +307,93 @@ export default function App() {
           />
           {radar && <Radar snapshot={snapshot} />}
           {pausado && <div className="pausa-ind">⏸ PAUSA</div>}
-          {!conectado && snapshot && <div className="reconectando">⟳ Reconectando telemetría…</div>}
           <div className="vista-toggle">
             <button className={radar ? "" : "on"} onClick={() => setRadar(false)}>🗺 Mapa</button>
             <button className={radar ? "on" : ""} onClick={() => setRadar(true)}>📡 Radar</button>
           </div>
-          <Leyenda swarms={swarms} abierta={leyendaAbierta} onToggle={() => setLeyendaAbierta((v) => !v)} />
+          <Leyenda swarms={swarms} />
           {!snapshot && <div className="cargando">Conectando con el servicio de telemetría…</div>}
         </main>
 
-        <aside className="rail rail-right">
-          <div className="inspector">
-            {dronVivo ? (
-              <Seccion titulo={`Unidad · ${dronVivo.id}`}>
-                <Telemetria d={dronVivo} />
-                <span className="etq">Modo de la unidad</span>
-                <div className="modos">
-                  {MODOS.map((m) => (
-                    <button key={m.id} className={"modo " + (dronVivo.mode === m.id ? "on" : "")}
-                      style={{ "--mc": m.color }} onClick={() => api.setModoDron(dronVivo.id, m.id)}>
-                      {m.label}
-                    </button>
+        <aside className="eventos">
+          {enjambre && miembros.length > 0 && (
+            <Seccion titulo={`Estadísticas · ${enjambre.nombre}`}>
+              <table className="stats">
+                <thead>
+                  <tr><th>Unidad</th><th>Vel</th><th>Bat</th><th>Señal</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {miembros.map((d) => (
+                    <tr key={d.id} className={(dronSel?.id === d.id ? "sel " : "") + d.status}
+                      onClick={() => setDronSel(d)}>
+                      <td>{d.id}</td>
+                      <td>{d.speed}</td>
+                      <td>{d.bateria}%</td>
+                      <td>{d.senal}%</td>
+                      <td><span className={"badge " + d.status}>{d.status}</span></td>
+                    </tr>
                   ))}
-                </div>
-                <Boton danger onClick={() => { api.eliminarNodo(dronVivo.id); setDronSel(null); }}>
-                  ✕ Eliminar nodo (simular pérdida)
-                </Boton>
-                <Boton onClick={() => setDronSel(null)}>← Volver al enjambre</Boton>
-              </Seccion>
-            ) : jammerVivo ? (
-              <Seccion titulo={`Interferencia · ${jammerVivo.id}`}>
-                <label className="campo">
-                  Radio: {Math.round(jammerVivo.radio_m)} m
-                  <input type="range" min="300" max="4000" step="100"
-                    value={jammerVivo.radio_m}
-                    onChange={(e) => api.actualizarJammer(jammerVivo.id, { radio_m: +e.target.value })} />
-                </label>
-                <p className="ayuda">Arrastra el ✛ en el mapa para moverla.</p>
-                <Boton danger onClick={() => { api.quitarJammer(jammerVivo.id); setJammerSel(null); }}>
-                  ✕ Quitar interferencia
-                </Boton>
-              </Seccion>
-            ) : enjambre ? (
-              <>
-                <Seccion titulo={`Control · ${enjambre.nombre}`}>
-                  <span className="etq">Modo operativo</span>
-                  <div className="modos">
-                    {MODOS.map((m) => (
-                      <button key={m.id} className={"modo " + (enjambre.mode === m.id ? "on" : "")}
-                        style={{ "--mc": m.color }} onClick={() => api.setModo(enjambre.id, m.id)}>
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid2" style={{ marginTop: 8 }}>
-                    <Boton onClick={() => api.dividir(enjambre.id, 2)} disabled={enjambre.n_miembros < 2}>
-                      ⋔ Dividir en 2
-                    </Boton>
-                    <Boton onClick={() => api.dividir(enjambre.id, 3)} disabled={enjambre.n_miembros < 3}>
-                      ⋔ Dividir en 3
-                    </Boton>
-                    <Boton onClick={centrarEnjambre}>⊙ Centrar</Boton>
-                    <Boton danger onClick={() => api.retornarBase(enjambre.id)} disabled={!enjambre.zona}>
-                      🗑 Eliminar zona
-                    </Boton>
-                  </div>
-                  {enjambre.zona && (
-                    <label className="campo" style={{ marginTop: 10 }}>
-                      Radio de zona: {Math.round(enjambre.zona.radio_m)} m
-                      <input type="range" min="500" max="5000" step="100"
-                        value={enjambre.zona.radio_m}
-                        onChange={(e) => api.setRadio(enjambre.id, +e.target.value)} />
-                    </label>
-                  )}
-                </Seccion>
-                {miembros.length > 0 && (
-                  <Seccion titulo="Telemetría por unidad">
-                    <table className="stats">
-                      <thead>
-                        <tr><th>Unidad</th><th>Vel</th><th>Bat</th><th>Señal</th><th>Estado</th></tr>
-                      </thead>
-                      <tbody>
-                        {miembros.map((d) => (
-                          <tr key={d.id} className={(dronSel?.id === d.id ? "sel " : "") + d.status}
-                            onClick={() => setDronSel(d)}>
-                            <td>{d.id}</td>
-                            <td>{d.speed}</td>
-                            <td>{d.bateria}%</td>
-                            <td>{d.senal}%</td>
-                            <td><span className={"badge " + d.status}>{d.status}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Seccion>
-                )}
-              </>
-            ) : (
-              <div className="inspector-vacio">
-                <span className="iv-ico">⌖</span>
-                <p>Selecciona un enjambre, unidad o interferencia para inspeccionarlo.</p>
-              </div>
-            )}
-          </div>
-
+                </tbody>
+              </table>
+            </Seccion>
+          )}
+          <Seccion titulo="Historial y datos">
+            <p className="ayuda" style={{ color: "var(--muted)", marginTop: 0 }}>
+              Muestras registradas (cada 5 s): <strong style={{ color: "var(--txt)" }}>{metricas.n_muestras ?? 0}</strong>
+            </p>
+            <Boton onClick={() => api.exportar("csv")} disabled={!metricas.n_muestras}>⬇ Exportar historial (CSV)</Boton>
+            <Boton danger onClick={() => api.exportarInterferencia()}
+              disabled={!(snapshot?.jammers?.length)}>
+              ⚠ Reporte de interferencia (CSV)
+            </Boton>
+          </Seccion>
           <Seccion titulo="Eventos y alertas">
             {eventos.length === 0 && <p className="vacio">Sin eventos.</p>}
-            <div className="lista-eventos">
-              {[...eventos].reverse().map((e) => (
-                <div key={e.id} className={"evento " + e.nivel}>
-                  <span className="evt-tipo">{e.tipo}</span>
-                  <span>{e.mensaje}</span>
-                </div>
-              ))}
-            </div>
+            {[...eventos].reverse().map((e) => (
+              <div key={e.id} className={"evento " + e.nivel}>
+                <span className="evt-tipo">{e.tipo}</span>
+                <span>{e.mensaje}</span>
+              </div>
+            ))}
           </Seccion>
         </aside>
       </div>
+
+      {modalEsc && (
+        <ModalEscenarios
+          escenarios={escenarios}
+          onSelect={lanzarEscenario}
+          onClose={() => setModalEsc(false)}
+        />
+      )}
+      {animModo && <AnimacionModo data={animModo} />}
+      {cargandoEsc && (
+        <PantallaCarga
+          nombre={cargandoEsc}
+          snapshot={snapshot}
+          onTerminar={() => setCargandoEsc(null)}
+        />
+      )}
     </div>
   );
 }
 
-function Leyenda({ swarms, abierta, onToggle }) {
+function Leyenda({ swarms }) {
   return (
-    <div className={"leyenda " + (abierta ? "" : "cerrada")}>
-      <button className="ly-cab" onClick={onToggle}>
-        <strong>Leyenda</strong>
-        <span className="ly-chevron">{abierta ? "▾" : "▸"}</span>
-      </button>
-      {abierta && (
-        <div className="ly-cuerpo">
-          <div className="ly-fila"><span className="ly-ico" style={{ color: "#fbbf24" }}>⬢</span> Base de operaciones</div>
-          <div className="ly-fila"><span className="ly-ico" style={{ color: "#ef4444" }}>▲</span> Dron degradado / interferencia</div>
-          <div className="ly-fila"><span className="ly-linea" /> Enlace mesh (mismo enjambre)</div>
-          <div className="ly-fila"><span className="ly-linea blanca" /> Enlace entre enjambres</div>
-          <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#ef4444" }} /> Zona de interferencia</div>
-          <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#38bdf8", borderStyle: "dashed" }} /> Zona asignada</div>
-          {swarms.length > 0 && <div className="ly-sep">Enjambres</div>}
-          {swarms.map((s) => (
-            <div className="ly-fila" key={s.id}>
-              <span className="ly-ico" style={{ color: s.color }}>▲</span> {s.nombre}
-            </div>
-          ))}
+    <div className="leyenda">
+      <strong>Leyenda</strong>
+      <div className="ly-fila"><span className="ly-ico" style={{ color: "#fbbf24" }}>⬢</span> Base de operaciones</div>
+      <div className="ly-fila"><span className="ly-ico" style={{ color: "#ef4444" }}>▲</span> Dron degradado / interferencia</div>
+      <div className="ly-fila"><span className="ly-linea" /> Enlace mesh (mismo enjambre)</div>
+      <div className="ly-fila"><span className="ly-linea blanca" /> Enlace entre enjambres</div>
+      <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#ef4444" }} /> Zona de interferencia</div>
+      <div className="ly-fila"><span className="ly-circ" style={{ borderColor: "#38bdf8", borderStyle: "dashed" }} /> Zona asignada</div>
+      {swarms.length > 0 && <div className="ly-sep">Enjambres</div>}
+      {swarms.map((s) => (
+        <div className="ly-fila" key={s.id}>
+          <span className="ly-ico" style={{ color: s.color }}>▲</span> {s.nombre}
         </div>
-      )}
+      ))}
     </div>
   );
 }

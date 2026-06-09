@@ -1,0 +1,25 @@
+@startuml componentes
+title Figura 6.6 - Diagrama de componentes (arquitectura modular / SOA) - SIMCODVE
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+actor "Operador académico" as Op
+
+[Interfaz gráfica\n(cliente web)] as UI
+[Motor de simulación] as Motor
+[Módulo de dominio\n(DronSimulado, Enjambre, Zona)] as Dominio
+[Servicios de comportamiento\n(control descentralizado, consenso,\nmodos, evasión)] as Comport
+[Módulo de configuración\n(parámetros y escenarios)] as Config
+[Módulo de entrada/salida\n(telemetría WS, exportación CSV)] as IO
+
+Op --> UI
+UI --> IO : REST / WebSocket
+IO --> Motor
+Motor --> Dominio
+Motor --> Comport
+Motor --> Config
+Comport --> Dominio
+Config --> Motor
+Motor --> IO : telemetría / métricas
+@enduml

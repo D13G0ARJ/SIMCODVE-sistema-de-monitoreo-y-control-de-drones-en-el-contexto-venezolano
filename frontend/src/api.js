@@ -1,4 +1,4 @@
-// Cliente de los servicios SIMCED (REST + WebSocket).
+// Cliente de los servicios SIMCODVE (REST + WebSocket).
 const BASE = "http://127.0.0.1:8000";
 const WS = "ws://127.0.0.1:8000/ws/telemetria";
 
@@ -16,21 +16,6 @@ async function del(path) {
   return r.json();
 }
 
-async function get(path) {
-  const r = await fetch(BASE + path);
-  return r.json();
-}
-
-// Dispara la descarga de un archivo servido por el backend (Content-Disposition).
-function descargar(path) {
-  const a = document.createElement("a");
-  a.href = BASE + path;
-  a.download = "";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
 export const api = {
   crearEnjambre: (count, lat, lon, mode, nombre) =>
     post("/api/enjambres", { count, lat, lon, mode, nombre }),
@@ -43,6 +28,7 @@ export const api = {
   setModo: (id, mode) => post(`/api/enjambres/${id}/modo`, { mode }),
   dividir: (id, partes, zonas) =>
     post(`/api/enjambres/${id}/dividir`, { partes, zonas }),
+  unir: (ids) => post("/api/enjambres/unir", { ids }),
   setModoDron: (id, mode) => post(`/api/drones/${id}/modo`, { mode }),
   eliminarNodo: (id) => post(`/api/fallos/nodo/${id}`),
   crearJammer: (lat, lon, radio_m) =>
@@ -52,14 +38,35 @@ export const api = {
   setVelocidad: (factor) => post("/api/config/velocidad", { factor }),
   setPausa: (pausado) => post("/api/config/pausa", { pausado }),
   reset: () => post("/api/reset"),
-  // monitoreo / datos / escenarios
-  cobertura: () => get("/api/cobertura"),
-  escenarios: () => get("/api/escenarios"),
-  cargarEscenario: (id) => post(`/api/escenarios/${id}`),
-  exportarHistorial: () => descargar("/api/export/historial.csv"),
-  exportarTelemetria: () => descargar("/api/export/telemetria.csv"),
-  exportarEstado: () => descargar("/api/export/estado.json"),
+  cargarEscenario: (id) => post(`/api/escenarios/${id}/cargar`),
+  exportar: (fmt) => window.open(`${BASE}/api/export/historial.${fmt}`, "_blank"),
+  exportarInterferencia: () => window.open(`${BASE}/api/export/interferencia.csv`, "_blank"),
 };
+
+export async function listarEscenarios() {
+  const r = await fetch(BASE + "/api/escenarios");
+  return (await r.json()).escenarios;
+}
+
+// Geocodificacion abierta (OpenStreetMap / Nominatim): devuelve VARIAS opciones
+// para que el usuario elija (autocompletado tipo Google Maps), priorizando Venezuela.
+export async function buscarLugares(texto, limite = 6) {
+  const url =
+    "https://nominatim.openstreetmap.org/search?format=json&limit=" + limite +
+    "&accept-language=es&countrycodes=ve&q=" +
+    encodeURIComponent(texto);
+  try {
+    const r = await fetch(url);
+    const arr = await r.json();
+    return (arr || []).map((x) => ({
+      lat: +x.lat,
+      lon: +x.lon,
+      nombre: x.display_name,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 // Ciudades de Venezuela para el buscador (vuelo del mapa).
 export const CIUDADES = [
@@ -84,8 +91,7 @@ export const CIUDADES = [
 ];
 
 // Mantiene una conexion WebSocket viva y reconecta si se cae.
-// onStatus(bool) notifica el estado del enlace (true = conectado).
-export function conectarTelemetria(onSnapshot, onStatus) {
+export function conectarTelemetria(onSnapshot) {
   let ws;
   let vivo = true;
   let pingTimer;
@@ -94,13 +100,11 @@ export function conectarTelemetria(onSnapshot, onStatus) {
     ws = new WebSocket(WS);
     ws.onmessage = (e) => onSnapshot(JSON.parse(e.data));
     ws.onopen = () => {
-      onStatus?.(true);
       pingTimer = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send("ping");
       }, 5000);
     };
     ws.onclose = () => {
-      onStatus?.(false);
       clearInterval(pingTimer);
       if (vivo) setTimeout(abrir, 1500);
     };

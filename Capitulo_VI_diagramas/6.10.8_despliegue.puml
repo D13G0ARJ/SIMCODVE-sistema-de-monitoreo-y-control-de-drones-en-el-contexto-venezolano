@@ -1,0 +1,27 @@
+@startuml despliegue
+title Figura 6.8 - Diagrama de despliegue - SIMCODVE
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+node "Computadora local del usuario" {
+  artifact "Navegador web\n(interfaz gráfica - cliente)" as Nav
+  node "Servidor local SIMCODVE\n(FastAPI / Uvicorn)" as Serv {
+    component "Motor de simulación" as Motor
+    component "Servicios REST / WebSocket" as Svc
+  }
+  artifact "Archivos locales\n(CSV de métricas e interferencia)" as Files
+}
+
+cloud "Servicios de mapas abiertos\n(solo cartografía)" as Mapas
+
+Nav --> Svc : REST / WebSocket (localhost)
+Svc --> Motor
+Motor --> Files : exportar
+Nav ..> Mapas : teselas / geocodificación
+
+note bottom of Serv
+  Sin conexión con drones físicos,
+  hardware aeronáutico, sensores ni
+  frecuencias reales. Datos sintéticos.
+end note
+@enduml

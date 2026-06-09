@@ -1,5 +1,5 @@
 """
-SIMCED - API de servicios (FastAPI).
+SIMCODVE - API de servicios (FastAPI).
 
 Expone el motor de simulacion como servicios (enfoque SOA):
   - Servicio de Telemetria      -> WebSocket /ws/telemetria (stream en tiempo real)
@@ -14,9 +14,8 @@ import asyncio
 import contextlib
 import csv
 import io
-import json
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -25,7 +24,7 @@ from . import escenarios
 from .models import SwarmMode
 from .simulation import DT, SimulationEngine
 
-app = FastAPI(title="SIMCED API", version="0.1.0")
+app = FastAPI(title="SIMCODVE API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,6 +147,10 @@ class DividirReq(BaseModel):
     zonas: list[ZonaReq] | None = None
 
 
+class UnirReq(BaseModel):
+    ids: list[str]
+
+
 class JammerReq(BaseModel):
     lat: float
     lon: float
@@ -197,6 +200,64 @@ def reset() -> dict:
     return {"ok": True}
 
 
+# --- Escenarios ---
+@app.get("/api/escenarios")
+def listar_escenarios() -> dict:
+    return {"escenarios": escenarios.listar()}
+
+
+@app.post("/api/escenarios/{escenario_id}/cargar")
+def cargar_escenario(escenario_id: str) -> dict:
+    ok = engine.cargar_escenario(escenario_id)
+    return {"ok": ok}
+
+
+# --- Exportacion del historial ---
+@app.get("/api/export/historial.json")
+def export_historial_json() -> dict:
+    return {"escenario": engine.escenario_actual, "muestras": engine.historial}
+
+
+@app.get("/api/reporte/interferencia")
+def reporte_interferencia() -> dict:
+    return engine.reporte_interferencia()
+
+
+@app.get("/api/export/interferencia.csv")
+def export_interferencia_csv() -> Response:
+    rep = engine.reporte_interferencia()
+    columnas = ["id", "lat", "lon", "radio_m", "drones_afectados", "enjambres_cercanos"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["# Reporte de interferencia - SIMCODVE",
+                f"t_simulacion_s={rep['t_simulacion_s']}", f"n_zonas={rep['n_zonas']}"])
+    w.writerow(columnas)
+    for z in rep["zonas"]:
+        w.writerow([z["id"], z["lat"], z["lon"], z["radio_m"],
+                    z["drones_afectados"], " | ".join(z["enjambres_cercanos"])])
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=simced_interferencia.csv"},
+    )
+
+
+@app.get("/api/export/historial.csv")
+def export_historial_csv() -> Response:
+    columnas = ["t", "n_drones", "activos", "operativos", "degradados",
+                "perdidos", "pct_operativo", "n_enjambres", "n_jammers"]
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=columnas)
+    w.writeheader()
+    for fila in engine.historial:
+        w.writerow(fila)
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=simced_historial.csv"},
+    )
+
+
 @app.post("/api/enjambres")
 def crear_enjambre(req: CrearEnjambreReq) -> dict:
     sw = engine.crear_enjambre(req.count, req.lat, req.lon, req.mode, req.nombre)
@@ -241,6 +302,13 @@ def dividir(swarm_id: str, req: DividirReq) -> dict:
             "enjambres": [s.to_dict(len(engine.miembros(s.id))) for s in nuevos]}
 
 
+@app.post("/api/enjambres/unir")
+def unir(req: UnirReq) -> dict:
+    sw = engine.unir_enjambres(req.ids)
+    return {"ok": sw is not None,
+            "enjambre": sw.to_dict(len(engine.miembros(sw.id))) if sw else None}
+
+
 @app.post("/api/drones/{drone_id}/modo")
 def set_modo_dron(drone_id: str, req: ModoReq) -> dict:
     engine.set_modo_dron(drone_id, req.mode)
@@ -271,73 +339,7 @@ def actualizar_jammer(jammer_id: str, req: JammerUpdateReq) -> dict:
     return {"ok": True}
 
 
-# ---------------------------------------------------------------------------
-# Monitoreo: cobertura (M2)
-# ---------------------------------------------------------------------------
-@app.get("/api/cobertura")
-def cobertura() -> dict:
-    return engine.cobertura_geojson()
-
-
-# ---------------------------------------------------------------------------
-# Exportacion de datos para resultados (M3)
-# ---------------------------------------------------------------------------
-def _csv(filas: list[dict], nombre: str) -> Response:
-    buf = io.StringIO()
-    if filas:
-        w = csv.DictWriter(buf, fieldnames=list(filas[0].keys()))
-        w.writeheader()
-        w.writerows(filas)
-    return Response(
-        content=buf.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
-    )
-
-
-@app.get("/api/export/historial.csv")
-def export_historial() -> Response:
-    """Series temporales de metricas muestreadas durante la corrida."""
-    return _csv(engine.historial, "simced_historial.csv")
-
-
-@app.get("/api/export/telemetria.csv")
-def export_telemetria() -> Response:
-    """Telemetria instantanea de todas las unidades."""
-    filas = [d.to_dict() for d in engine.drones.values()]
-    for f in filas:
-        f["vecinos"] = len(f.get("vecinos", []))  # CSV no admite listas
-    return _csv(filas, "simced_telemetria.csv")
-
-
-@app.get("/api/export/estado.json")
-def export_estado() -> Response:
-    """Snapshot completo del estado (incluye metricas y eventos)."""
-    return Response(
-        content=json.dumps(engine.snapshot(), ensure_ascii=False, indent=2),
-        media_type="application/json",
-        headers={"Content-Disposition": 'attachment; filename="simced_estado.json"'},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Escenarios precargados (S3)
-# ---------------------------------------------------------------------------
-@app.get("/api/escenarios")
-def listar_escenarios() -> dict:
-    return {"escenarios": escenarios.listar()}
-
-
-@app.post("/api/escenarios/{escenario_id}")
-def cargar_escenario(escenario_id: str) -> dict:
-    spec = escenarios.ESCENARIOS.get(escenario_id)
-    if not spec:
-        raise HTTPException(status_code=404, detail="Escenario no encontrado")
-    engine.cargar_escenario(spec)
-    return {"ok": True, "nombre": spec["nombre"]}
-
-
 @app.get("/")
 def raiz() -> dict:
-    return {"servicio": "SIMCED API", "estado": "activo",
+    return {"servicio": "SIMCODVE API", "estado": "activo",
             "docs": "/docs", "telemetria": "/ws/telemetria"}

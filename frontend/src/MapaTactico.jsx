@@ -11,7 +11,7 @@ import "leaflet/dist/leaflet.css";
 const LOS_TEQUES = [10.344, -67.041];
 
 export default function MapaTactico({
-  snapshot, herramienta, cobertura, onMapClick, onDronClick, onZonaMove, onZonaClick, onJammerMove, onJammerClick,
+  snapshot, herramienta, onMapClick, onDronClick, onZonaMove, onZonaClick, onJammerMove, onJammerClick,
 }) {
   const contenedor = useRef(null);
   const mapa = useRef(null);
@@ -47,7 +47,6 @@ export default function MapaTactico({
       { position: "topright", collapsed: false }
     ).addTo(m);
 
-    capas.current.cobertura = L.layerGroup().addTo(m);  // heatmap de cobertura (M2)
     capas.current.base = L.layerGroup().addTo(m);
     capas.current.zonas = L.layerGroup().addTo(m);   // contenedor de zonas/handles
     capas.current.jammers = L.layerGroup().addTo(m);
@@ -63,29 +62,6 @@ export default function MapaTactico({
     if (!contenedor.current) return;
     contenedor.current.style.cursor = herramienta === "normal" ? "grab" : "crosshair";
   }, [herramienta]);
-
-  // ---- heatmap de cobertura (M2): celdas coloreadas por nº de visitas ----
-  useEffect(() => {
-    const capa = capas.current.cobertura;
-    if (!capa) return;
-    capa.clearLayers();
-    if (!cobertura || !cobertura.celdas?.length) return;
-    const { paso, max, celdas } = cobertura;
-    const h = paso / 2;
-    celdas.forEach((c) => {
-      const t = max ? c.n / max : 0;        // intensidad 0..1
-      const hue = 60 * (1 - t);             // amarillo (poco) -> rojo (mucho)
-      L.rectangle(
-        [[c.lat - h, c.lon - h], [c.lat + h, c.lon + h]],
-        {
-          stroke: false,
-          fillColor: `hsl(${hue}, 90%, 50%)`,
-          fillOpacity: 0.15 + 0.5 * t,
-          interactive: false,
-        }
-      ).addTo(capa);
-    });
-  }, [cobertura]);
 
   // ---- crea un "handle" arrastrable (cruz central) ----
   function crearHandle(lat, lon, color, claveArrastre, onMove, onClickSel) {
@@ -147,7 +123,6 @@ export default function MapaTactico({
           weight: 1,
           opacity: interEnjambre ? 0.55 : 0.45,
           dashArray: interEnjambre ? "4 5" : null,
-          className: interEnjambre ? "mesh-inter" : "mesh-link",
           interactive: false,
         }).addTo(mesh);
       });

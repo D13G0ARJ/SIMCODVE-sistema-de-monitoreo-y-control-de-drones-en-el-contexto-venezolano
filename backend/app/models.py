@@ -1,5 +1,5 @@
 """
-Modelos de dominio de SIMCED.
+Modelos de dominio de SIMCODVE.
 
 Cada dron es un GEMELO DIGITAL: un objeto que representa virtualmente una unidad
 tipo dron, con sus atributos, estado y telemetria sintetica. No hay drones fisicos
@@ -64,6 +64,7 @@ class Drone:
     vx: float = 0.0
     vy: float = 0.0
     vecinos: list[str] = field(default_factory=list)  # ids con enlace mesh activo
+    cargando: bool = False                            # esta recargando en la base
 
     def to_dict(self) -> dict:
         return {
@@ -93,6 +94,7 @@ class Swarm:
     mode: SwarmMode = SwarmMode.PATRULLAJE
     zona: Zone | None = None
     color: str = "#22d3ee"
+    mision_pendiente: Zone | None = None  # zona a retomar tras recargar en base
 
     def to_dict(self, n_miembros: int) -> dict:
         return {

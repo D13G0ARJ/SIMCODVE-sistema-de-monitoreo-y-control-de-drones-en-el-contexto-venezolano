@@ -1,0 +1,24 @@
+@startuml secuencia_perdida
+title Figura 6.4 - Diagrama de secuencia: pérdida de comunicación simulada - SIMCODVE
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+participant "Motor de simulación" as Motor
+participant "DronSimulado" as Dron
+participant "Servicio de alertas" as Alert
+participant "VistaRadar" as Radar
+participant "GestorMétricas" as Met
+
+activate Motor
+Motor -> Dron : actualizar unidades
+Motor -> Motor : detectar evento de\ndesconexión (interferencia /\nfuera de rango mesh)
+Motor -> Dron : cambiar estado a\n"Comunicación perdida" (DEGRADADO)
+activate Dron
+Dron --> Motor : estado actualizado
+deactivate Dron
+Motor -> Alert : generar alerta\n(pérdida de comunicación)
+Alert -> Radar : marcar unidad afectada
+Alert -> Met : registrar métrica\n(% operativo, evento)
+Motor -> Motor : reorganizar enjambre\n(evasión / continuidad)
+deactivate Motor
+@enduml
