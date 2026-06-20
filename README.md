@@ -1,3 +1,13 @@
+---
+title: SIMCODVE
+emoji: 🛰️
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # SIMCODVE
 **Sistema de Monitoreo y Control de Drones — Contexto Venezolano**
 
@@ -89,6 +99,38 @@ Abrir el navegador en la dirección que muestre Vite (normalmente http://localho
 
 > En Windows también pueden usarse los scripts `iniciar-backend.bat` e
 > `iniciar-frontend.bat` (doble clic).
+
+---
+
+## Despliegue gratis (Hugging Face Spaces)
+
+Todo el sistema (backend + frontend) vive en **un único Space gratis** gracias al
+`Dockerfile`: compila el frontend con Vite y lo sirve desde FastAPI en el mismo
+origen, así el WebSocket de telemetría apunta al propio Space (no hay que tocar
+URLs).
+
+1. Crear cuenta en <https://huggingface.co> → **New Space**.
+2. Elegir **SDK: Docker** (plantilla *Blank*), visibilidad *Public*, hardware
+   *CPU basic* (gratis).
+3. Subir este repositorio al Space (Git):
+   ```bash
+   git remote add space https://huggingface.co/spaces/<usuario>/<nombre-space>
+   git push space main
+   ```
+   (o arrastrar los archivos desde la pestaña *Files* del Space).
+4. El Space detecta el `Dockerfile`, construye la imagen y queda en
+   `https://<usuario>-<nombre-space>.hf.space`.
+
+> El puerto `7860` y la metadata (`sdk: docker`, etc.) ya están configurados en
+> la cabecera de este `README.md`, que es lo que lee Hugging Face. No hace falta
+> GPU: la simulación es ligera y corre en CPU.
+
+### Probar la imagen Docker en local (opcional)
+```bash
+docker build -t simcodve .
+docker run -p 7860:7860 simcodve
+# Abrir http://localhost:7860
+```
 
 ---
 

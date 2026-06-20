@@ -14,10 +14,12 @@ import asyncio
 import contextlib
 import csv
 import io
+from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import escenarios
@@ -339,7 +341,18 @@ def actualizar_jammer(jammer_id: str, req: JammerUpdateReq) -> dict:
     return {"ok": True}
 
 
-@app.get("/")
+@app.get("/api")
 def raiz() -> dict:
     return {"servicio": "SIMCODVE API", "estado": "activo",
             "docs": "/docs", "telemetria": "/ws/telemetria"}
+
+
+# ---------------------------------------------------------------------------
+# Frontend compilado (build de Vite). Si existe frontend/dist, se sirve la SPA
+# desde el MISMO origen que la API (despliegue de una sola URL, p.ej. en un
+# Space de Hugging Face). En desarrollo no existe y este bloque no hace nada.
+# Se monta al final para que las rutas /api/... y /ws/... tengan prioridad.
+# ---------------------------------------------------------------------------
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")

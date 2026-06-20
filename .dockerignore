@@ -1,0 +1,18 @@
+# No copiar dependencias ni artefactos locales a la imagen
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+.venv
+venv
+.git
+.vscode
+.idea
+*.log
+
+# Documentos pesados de la tesis (no hacen falta para el despliegue)
+*.pdf
+*.docx
+Capitulo_VI*
+referencia.docx
+_hacer_docx.py

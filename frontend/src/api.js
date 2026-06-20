@@ -1,6 +1,16 @@
 // Cliente de los servicios SIMCODVE (REST + WebSocket).
-const BASE = "http://127.0.0.1:8000";
-const WS = "ws://127.0.0.1:8000/ws/telemetria";
+//
+// En desarrollo (vite dev) el backend corre aparte en 127.0.0.1:8000.
+// En produccion (build servido por el propio backend, p.ej. en un Space de
+// Hugging Face) usamos el MISMO origen: BASE vacio -> rutas relativas, y el
+// WebSocket se deriva de la URL actual (ws:// o wss:// segun el protocolo).
+const DEV = import.meta.env.DEV;
+const BASE = DEV ? "http://127.0.0.1:8000" : "";
+const WS = DEV
+  ? "ws://127.0.0.1:8000/ws/telemetria"
+  : (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host +
+    "/ws/telemetria";
 
 async function post(path, body) {
   const r = await fetch(BASE + path, {
