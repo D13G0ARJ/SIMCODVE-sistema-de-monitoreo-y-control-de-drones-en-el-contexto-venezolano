@@ -1,13 +1,3 @@
----
-title: SIMCODVE
-emoji: 🛰️
-colorFrom: blue
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # SIMCODVE
 **Sistema de Monitoreo y Control de Drones — Contexto Venezolano**
 
