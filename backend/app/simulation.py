@@ -42,8 +42,9 @@ RECARGA_BATERIA = 0.6            # % por segundo (en la base)
 UMBRAL_RTB = 20.0                # % de bateria que dispara el retorno automatico
 UMBRAL_RECARGADO = 95.0          # % de bateria con el que el enjambre retoma su mision
 RADIO_BASE_M = 450.0             # radio de merodeo alrededor de la base
+BASE_DEFECTO = {"lat": 10.34915, "lon": -67.02262}   # UNEFA Nucleo Altos Mirandinos (Los Teques)
 OMEGA_PATRULLA = 0.12            # velocidad angular del barrido (rad/s)
-VEL_DEFENSA = 5.0                # velocidad tangencial (m/s) de la orbita lenta en defensa
+CELDA_COBERTURA_M = 150.0        # lado de cada celda de la grilla de cobertura (m)
 MUESTREO_HISTORIAL_S = 5.0       # cada cuantos segundos (de simulacion) se guarda una muestra
 MARGEN_EVASION_M = 250.0         # banda fina de seguridad pegada al borde del jammer
 MARGEN_CORDON = 150.0            # a que distancia FUERA del borde rojo se ubica el objetivo
@@ -76,12 +77,14 @@ class SimulationEngine:
         self.jammers: dict[str, Jammer] = {}
         self.eventos: list[dict] = []
         # base de operaciones por defecto: Los Teques (Altos Mirandinos)
-        self.base = Zone(lat=10.344, lon=-67.041, radio_m=RADIO_BASE_M)
+        self.base = Zone(lat=BASE_DEFECTO["lat"], lon=BASE_DEFECTO["lon"], radio_m=RADIO_BASE_M)
         self.factor = 1.0  # factor de tiempo (1x..8x)
         self.tiempo = 0.0  # tiempo de simulacion acumulado (s), para el barrido
         self.pausado = False
         self.historial: list[dict] = []      # serie temporal de metricas (para exportar)
         self._ultima_muestra = 0.0
+        # celdas (grilla) ya visitadas por algun dron -> base de la metrica de cobertura
+        self.cobertura: set[tuple[int, int]] = set()
         self.escenario_actual: str | None = None
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
@@ -126,12 +129,13 @@ class SimulationEngine:
         self.swarms.clear()
         self.jammers.clear()
         self.eventos.clear()
-        self.base = base or Zone(lat=10.344, lon=-67.041, radio_m=RADIO_BASE_M)
+        self.base = base or Zone(lat=BASE_DEFECTO["lat"], lon=BASE_DEFECTO["lon"], radio_m=RADIO_BASE_M)
         self.factor = 1.0
         self.tiempo = 0.0
         self.pausado = False
         self.historial = []
         self._ultima_muestra = 0.0
+        self.cobertura = set()
         self.escenario_actual = None
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
@@ -426,6 +430,7 @@ class SimulationEngine:
                 d.senal = min(100.0, d.senal + 6.0)
 
         self._calcular_mesh(activos)
+        self._actualizar_cobertura(activos)   # marca las celdas pisadas este paso
 
         # agrupar miembros por enjambre (una sola vez)
         grupos: dict[str, list[Drone]] = {}
@@ -500,23 +505,114 @@ class SimulationEngine:
             self._muestrear_historial()
 
     def _muestrear_historial(self) -> None:
+        """Guarda una fila de la serie temporal de metricas (cada MUESTREO_HISTORIAL_S).
+        Las claves coinciden con las columnas del CSV/JSON exportado."""
         total = len(self.drones)
         activos = [d for d in self.drones.values() if d.status != DroneStatus.PERDIDO]
         operativos = [d for d in activos if d.status == DroneStatus.ACTIVO]
         degradados = [d for d in activos if d.status == DroneStatus.DEGRADADO]
         pct = round(100.0 * len(operativos) / total, 1) if total else 0.0
+        conect, n_part = self._calcular_particiones(activos)
+        consenso = self._calcular_consenso()
+        cob_pct, celdas = self._calcular_cobertura_pct()
         self.historial.append({
-            "t": round(self.tiempo, 1),
-            "n_drones": total,
-            "activos": len(activos),
+            "tiempo_s": round(self.tiempo, 1),
+            "drones_totales": total,
             "operativos": len(operativos),
             "degradados": len(degradados),
             "perdidos": total - len(activos),
             "pct_operativo": pct,
+            "conectividad_pct": conect,
+            "n_particiones": n_part,
+            "consenso_pct": consenso,
+            "cobertura_pct": cob_pct,
+            "celdas_cubiertas": celdas,
             "n_enjambres": len(self.swarms),
             "n_jammers": len(self.jammers),
         })
         self.historial = self.historial[-2000:]
+
+    # ------------------------------------------------------------------
+    # Metricas de control descentralizado (resiliencia / consenso / eficacia)
+    # ------------------------------------------------------------------
+    def _calcular_particiones(self, activos: list[Drone]) -> tuple[float, int]:
+        """Sobre la malla (vecinos), con union-find: devuelve
+        (conectividad % = drones en el mayor componente conectado, n_particiones).
+        100% y 1 particion = toda la flota se comunica; valores menores = la red
+        se fragmento (drones aislados o subgrupos sin enlace)."""
+        n = len(activos)
+        if n == 0:
+            return 0.0, 0
+        padre = {d.id: d.id for d in activos}
+
+        def find(x: str) -> str:
+            while padre[x] != x:
+                padre[x] = padre[padre[x]]
+                x = padre[x]
+            return x
+
+        for d in activos:
+            for vid in d.vecinos:
+                if vid in padre:
+                    ra, rb = find(d.id), find(vid)
+                    if ra != rb:
+                        padre[ra] = rb
+
+        tam: dict[str, int] = {}
+        for d in activos:
+            r = find(d.id)
+            tam[r] = tam.get(r, 0) + 1
+        mayor = max(tam.values())
+        return round(100.0 * mayor / n, 1), len(tam)
+
+    def _calcular_consenso(self) -> float:
+        """Consenso de rumbos: coherencia circular media de los headings por enjambre
+        (0..100%). 100% = todos los drones del enjambre apuntan al mismo rumbo
+        (consenso logrado sin lider); valores bajos = rumbos dispersos. Promedio
+        sobre los enjambres con 2+ unidades."""
+        coherencias: list[float] = []
+        for sw in self.swarms.values():
+            ms = [d for d in self.miembros(sw.id) if d.status != DroneStatus.PERDIDO]
+            if len(ms) < 2:
+                continue
+            sx = sum(math.cos(math.radians(d.heading)) for d in ms)
+            sy = sum(math.sin(math.radians(d.heading)) for d in ms)
+            coherencias.append(math.hypot(sx, sy) / len(ms))
+        if not coherencias:
+            return 0.0
+        return round(100.0 * sum(coherencias) / len(coherencias), 1)
+
+    def _celda(self, lat: float, lon: float) -> tuple[int, int]:
+        """Indice (i, j) de la celda de la grilla de cobertura para una posicion."""
+        e, n = offset_metros(self.base.lat, self.base.lon, lat, lon)
+        return (math.floor(e / CELDA_COBERTURA_M), math.floor(n / CELDA_COBERTURA_M))
+
+    def _actualizar_cobertura(self, activos: list[Drone]) -> None:
+        """Marca como visitadas las celdas donde hay drones en este paso."""
+        for d in activos:
+            self.cobertura.add(self._celda(d.lat, d.lon))
+
+    def _calcular_cobertura_pct(self) -> tuple[float, int]:
+        """Eficacia de barrido: de las celdas que caen DENTRO de las zonas asignadas,
+        que porcentaje ya fue visitado al menos una vez. Devuelve (%, celdas_visitadas
+        dentro de las zonas). Sin zonas asignadas devuelve (0, 0)."""
+        objetivo: set[tuple[int, int]] = set()
+        for sw in self.swarms.values():
+            z = sw.zona
+            if z is None:
+                continue
+            ce, cn = offset_metros(self.base.lat, self.base.lon, z.lat, z.lon)
+            ci, cj = math.floor(ce / CELDA_COBERTURA_M), math.floor(cn / CELDA_COBERTURA_M)
+            rad = math.ceil(z.radio_m / CELDA_COBERTURA_M)
+            r2 = (z.radio_m / CELDA_COBERTURA_M) ** 2
+            for i in range(ci - rad, ci + rad + 1):
+                for j in range(cj - rad, cj + rad + 1):
+                    if (i - ci) ** 2 + (j - cj) ** 2 <= r2:
+                        objetivo.add((i, j))
+        if not objetivo:
+            return 0.0, 0
+        cubiertas = objetivo & self.cobertura
+        return round(100.0 * len(cubiertas) / len(objetivo), 1), len(cubiertas)
 
     def _calcular_mesh(self, activos: list[Drone]) -> None:
         """Red mesh GLOBAL: cualquier dron en rango se enlaza, sin importar el
@@ -537,6 +633,7 @@ class SimulationEngine:
         """Mueve el enjambre con direccion de Reynolds (steering behaviors)."""
         objetivo = sw.zona if sw.zona else self.base
         en_base = sw.zona is None   # sin mision: estacionado en la base
+        idx_de = {m.id: i for i, m in enumerate(miembros)}  # posicion de cada dron
         for d in miembros:
             vmax = VEL_MAX * (0.4 if d.status == DroneStatus.DEGRADADO else 1.0)
             w = self._pesos_modo(d.mode)
@@ -558,7 +655,14 @@ class SimulationEngine:
                 if dist < DIST_SEPARACION:
                     sep_x -= ex / dist
                     sep_y -= ey / dist
+                # alineacion/cohesion solo dentro del propio enjambre; en HIBRIDO,
+                # ademas solo con el MISMO anillo (misma paridad de indice), para que
+                # el anillo exterior (barrido) y el interior (defensa estatica) no se
+                # arrastren entre si y la formacion no se desestabilice ("cizalla").
                 if v.swarm_id == d.swarm_id:
+                    if d.mode == SwarmMode.HIBRIDO and \
+                            idx_de.get(v.id, 0) % 2 != idx_de.get(d.id, 0) % 2:
+                        continue
                     ali_x += v.vx
                     ali_y += v.vy
                     coh_x += ex
@@ -608,7 +712,11 @@ class SimulationEngine:
 
             d.lat, d.lon = aplicar_offset(d.lat, d.lon, d.vx * dt, d.vy * dt)
             d.speed = math.hypot(d.vx, d.vy)
-            if d.mode == SwarmMode.DEFENSA and sw.zona is not None:
+            # centinela (mira hacia afuera): toda DEFENSA y el anillo interior estatico
+            # del HIBRIDO (indice impar), que se queda fijo sosteniendo el nucleo.
+            es_centinela = d.mode == SwarmMode.DEFENSA or (
+                d.mode == SwarmMode.HIBRIDO and idx_de.get(d.id, 0) % 2 == 1)
+            if es_centinela and sw.zona is not None:
                 # centinela: mira hacia afuera (del centro de la zona hacia el dron)
                 oe, on = offset_metros(sw.zona.lat, sw.zona.lon, d.lat, d.lon)
                 if math.hypot(oe, on) > 1.0:
@@ -682,15 +790,18 @@ class SimulationEngine:
             r = zona.radio_m * (0.32 + 0.62 * frac)
             omega = min(OMEGA_PATRULLA, 0.5 * VEL_CRUCERO / (zona.radio_m * 0.95))
             ang = ang_base + omega * self.tiempo
-        else:  # HIBRIDO = mezcla real: mitad patrulla (barrido exterior),
-               # mitad defiende (anillo interior con orbita lenta)
+        else:  # HIBRIDO = dos anillos concentricos: exterior patrulla, interior defiende.
+            # Con cohesion baja (ver _pesos_modo) el objetivo domina, asi que cada anillo
+            # se mantiene firme en su radio (como DEFENSA) en vez de colapsar al centro.
             if idx % 2 == 0:
-                r = zona.radio_m * 0.85
-                omega = min(OMEGA_PATRULLA, 0.6 * VEL_CRUCERO / max(r, 1.0))
+                # EXTERIOR: barrido rotatorio que cubre el perimetro.
+                r = zona.radio_m * 0.9
+                omega = min(OMEGA_PATRULLA, 0.5 * VEL_CRUCERO / (zona.radio_m * 0.9))
+                ang = ang_base + omega * self.tiempo
             else:
-                r = zona.radio_m * 0.45
-                omega = VEL_DEFENSA / max(r, 1.0)
-            ang = ang_base + omega * self.tiempo
+                # INTERIOR: anillo defensivo ESTATICO que sostiene el nucleo.
+                r = zona.radio_m * 0.5
+                ang = ang_base
 
         # punto objetivo sobre el anillo, relativo al dron = (dron->centro) + (centro->punto)
         objetivo_e = este + math.cos(ang) * r
@@ -719,7 +830,9 @@ class SimulationEngine:
             return {"sep": 1.6, "ali": 0.6, "coh": 1.0, "obj": 1.5}
         if mode == SwarmMode.PATRULLAJE:
             return {"sep": 1.5, "ali": 1.0, "coh": 0.7, "obj": 1.2}
-        return {"sep": 1.6, "ali": 1.1, "coh": 1.0, "obj": 1.3}
+        # HIBRIDO: cohesion BAJA y objetivo fuerte para que los dos anillos no se
+        # fundan ni colapsen al centro (mantienen radios firmes, como DEFENSA).
+        return {"sep": 1.6, "ali": 0.6, "coh": 0.3, "obj": 1.7}
 
     # ------------------------------------------------------------------
     # Serializacion del estado para el frontend
@@ -732,6 +845,9 @@ class SimulationEngine:
         degradados = [d for d in activos if d.status == DroneStatus.DEGRADADO]
         total = len(self.drones)
         pct = round(100.0 * len(operativos) / total, 1) if total else 0.0
+        conect, n_part = self._calcular_particiones(activos)
+        consenso = self._calcular_consenso()
+        cob_pct, celdas = self._calcular_cobertura_pct()
         return {
             "drones": drones,
             "swarms": swarms,
@@ -747,6 +863,11 @@ class SimulationEngine:
                 "degradados": len(degradados),
                 "perdidos": total - len(activos),
                 "pct_operativo": pct,
+                "conectividad_pct": conect,
+                "n_particiones": n_part,
+                "consenso_pct": consenso,
+                "cobertura_pct": cob_pct,
+                "celdas_cubiertas": celdas,
                 "n_enjambres": len(self.swarms),
                 "n_muestras": len(self.historial),
             },

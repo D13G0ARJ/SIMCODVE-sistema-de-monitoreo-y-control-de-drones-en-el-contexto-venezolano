@@ -275,23 +275,6 @@ export default function App() {
             </Seccion>
           )}
 
-          {dronVivo && (
-            <Seccion titulo={`Unidad ${dronVivo.id}`}>
-              <Telemetria d={dronVivo} />
-              <span className="etq">Modo de la unidad</span>
-              <div className="modos">
-                {MODOS.map((m) => (
-                  <button key={m.id} className={"modo " + (dronVivo.mode === m.id ? "on" : "")}
-                    style={{ "--mc": m.color }} onClick={() => api.setModoDron(dronVivo.id, m.id)}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <Boton danger onClick={() => { api.eliminarNodo(dronVivo.id); setDronSel(null); }}>
-                ✕ Eliminar nodo (simular pérdida)
-              </Boton>
-            </Seccion>
-          )}
         </aside>
 
         <main className="mapa-wrap">
@@ -335,6 +318,23 @@ export default function App() {
                   ))}
                 </tbody>
               </table>
+            </Seccion>
+          )}
+          {dronVivo && (
+            <Seccion titulo={`Unidad ${dronVivo.id}`}>
+              <Telemetria d={dronVivo} />
+              <span className="etq">Modo de la unidad</span>
+              <div className="modos">
+                {MODOS.map((m) => (
+                  <button key={m.id} className={"modo " + (dronVivo.mode === m.id ? "on" : "")}
+                    style={{ "--mc": m.color }} onClick={() => api.setModoDron(dronVivo.id, m.id)}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <Boton danger onClick={() => { api.eliminarNodo(dronVivo.id); setDronSel(null); }}>
+                ✕ Eliminar nodo (simular pérdida)
+              </Boton>
             </Seccion>
           )}
           <Seccion titulo="Historial y datos">

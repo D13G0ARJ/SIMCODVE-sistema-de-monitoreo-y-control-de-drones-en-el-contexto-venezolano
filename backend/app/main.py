@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from . import escenarios
 from .models import SwarmMode
-from .simulation import DT, SimulationEngine
+from .simulation import CELDA_COBERTURA_M, DT, MUESTREO_HISTORIAL_S, SimulationEngine
 
 app = FastAPI(title="SIMCODVE API", version="0.1.0")
 
@@ -215,9 +215,49 @@ def cargar_escenario(escenario_id: str) -> dict:
 
 
 # --- Exportacion del historial ---
+# Columnas del historial: (clave, encabezado_legible, descripcion). Unica fuente de
+# verdad para CSV y JSON; la clave coincide con la que guarda _muestrear_historial.
+COLUMNAS_HISTORIAL: list[tuple[str, str, str]] = [
+    ("tiempo_s", "tiempo_s",
+     "Tiempo de simulacion transcurrido, en segundos."),
+    ("drones_totales", "drones_totales",
+     "Cantidad total de drones en la simulacion."),
+    ("operativos", "operativos",
+     "Drones ACTIVOS (enlace y senal normales)."),
+    ("degradados", "degradados",
+     "Drones DEGRADADOS por interferencia (senal y velocidad reducidas)."),
+    ("perdidos", "perdidos",
+     "Drones dados de baja por fallo de nodo."),
+    ("pct_operativo", "pct_operativo",
+     "Porcentaje de la flota operativa (operativos / total)."),
+    ("conectividad_pct", "conectividad_pct",
+     "Porcentaje de drones en el mayor componente conectado de la malla "
+     "(100 = toda la flota se comunica)."),
+    ("n_particiones", "n_particiones",
+     "Numero de subredes desconectadas (1 = red integra; >1 = malla fragmentada)."),
+    ("consenso_pct", "consenso_pct",
+     "Consenso de rumbos: coherencia circular media por enjambre "
+     "(100 = rumbos alineados, sin lider)."),
+    ("cobertura_pct", "cobertura_pct",
+     "Porcentaje del area de las zonas asignadas ya visitada al menos una vez."),
+    ("celdas_cubiertas", "celdas_cubiertas",
+     f"Celdas de {CELDA_COBERTURA_M:g} m visitadas dentro de las zonas asignadas."),
+    ("n_enjambres", "n_enjambres",
+     "Cantidad de enjambres activos."),
+    ("n_jammers", "n_jammers",
+     "Cantidad de zonas de interferencia activas."),
+]
+
+
 @app.get("/api/export/historial.json")
 def export_historial_json() -> dict:
-    return {"escenario": engine.escenario_actual, "muestras": engine.historial}
+    return {
+        "escenario": engine.escenario_actual,
+        "muestreo_cada_s": MUESTREO_HISTORIAL_S,
+        "n_muestras": len(engine.historial),
+        "columnas": [{"clave": k, "descripcion": d} for k, _, d in COLUMNAS_HISTORIAL],
+        "muestras": engine.historial,
+    }
 
 
 @app.get("/api/reporte/interferencia")
@@ -246,13 +286,21 @@ def export_interferencia_csv() -> Response:
 
 @app.get("/api/export/historial.csv")
 def export_historial_csv() -> Response:
-    columnas = ["t", "n_drones", "activos", "operativos", "degradados",
-                "perdidos", "pct_operativo", "n_enjambres", "n_jammers"]
+    claves = [k for k, _, _ in COLUMNAS_HISTORIAL]
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=columnas)
-    w.writeheader()
+    w = csv.writer(buf)
+    # cabecera explicativa (lineas '#') para que el CSV sea autoexplicativo
+    w.writerow(["# SIMCODVE - Historial de metricas (control descentralizado)"])
+    w.writerow([f"# escenario={engine.escenario_actual}",
+                f"muestreo_cada_s={MUESTREO_HISTORIAL_S:g}",
+                f"n_muestras={len(engine.historial)}"])
+    w.writerow(["# Significado de las columnas:"])
+    for _, encabezado, desc in COLUMNAS_HISTORIAL:
+        w.writerow([f"#   {encabezado}: {desc}"])
+    # fila de encabezados y datos
+    w.writerow([enc for _, enc, _ in COLUMNAS_HISTORIAL])
     for fila in engine.historial:
-        w.writerow(fila)
+        w.writerow([fila.get(k, "") for k in claves])
     return Response(
         content=buf.getvalue(),
         media_type="text/csv",

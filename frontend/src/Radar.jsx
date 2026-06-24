@@ -9,6 +9,18 @@ import L from "leaflet";
 const M_LAT = 111320;
 const mLon = (lat) => 111320 * Math.cos((lat * Math.PI) / 180);
 
+// separación REDONDA entre anillos (como un radar real): 250 m, 500 m, 1 km, 2.5 km…
+function pasoRedondo(x) {
+  const mag = Math.pow(10, Math.floor(Math.log10(x)));
+  const n = x / mag;
+  const cand = [1, 2, 2.5, 5, 10];
+  let best = cand[0];
+  for (const ci of cand) if (Math.abs(ci - n) < Math.abs(best - n)) best = ci;
+  return best * mag;
+}
+const etiquetaDist = (m) =>
+  m >= 1000 ? (m / 1000).toFixed(m % 1000 === 0 ? 0 : 1) + " km" : Math.round(m) + " m";
+
 export default function Radar({ snapshot }) {
   const wrapRef = useRef(null);
   const mapDivRef = useRef(null);
@@ -29,7 +41,7 @@ export default function Radar({ snapshot }) {
       dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
       boxZoom: false, keyboard: false, touchZoom: false,
       fadeAnimation: false, zoomAnimation: false, inertia: false,
-    }).setView([10.344, -67.041], 13);
+    }).setView([10.34915, -67.02262], 13);
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png",
       { maxZoom: 19, opacity: 0.95 }
@@ -99,15 +111,19 @@ export default function Radar({ snapshot }) {
       ctx.fillRect(0, 0, W, H);
       ctx.font = "10px monospace";
 
-      // anillos de alcance (a distancias reales) + etiquetas
-      ctx.strokeStyle = "rgba(52,211,153,0.35)";
+      // anillos de alcance a distancias REDONDAS (como un radar real) + etiquetas
+      const alcanceBorde = R * mpp;                 // distancia real en el borde del scope
+      const paso = pasoRedondo(alcanceBorde / 4);   // ~4 anillos, en numeros redondos
       ctx.fillStyle = "rgba(110,231,183,0.8)";
-      for (let i = 1; i <= 4; i++) {
-        const rr = (R * i) / 4;
+      for (let d = paso; d / mpp <= R - 1; d += paso) {
+        const rr = d / mpp;
+        ctx.strokeStyle = "rgba(52,211,153,0.30)";
         ctx.beginPath(); ctx.arc(c.x, c.y, rr, 0, 2 * Math.PI); ctx.stroke();
-        const m = rr * mpp;
-        ctx.fillText(m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m", c.x + 4, c.y - rr + 12);
+        ctx.fillText(etiquetaDist(d), c.x + 4, c.y - rr + 12);
       }
+      // borde del scope (anillo exterior, mas marcado)
+      ctx.strokeStyle = "rgba(52,211,153,0.55)";
+      ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, 2 * Math.PI); ctx.stroke();
 
       // cruz cardinal
       ctx.strokeStyle = "rgba(52,211,153,0.25)";

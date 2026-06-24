@@ -21,7 +21,7 @@ ESCENARIOS: dict[str, dict] = {
         "nombre": "Patrullaje urbano — Los Teques",
         "descripcion": "Un enjambre patrulla en barrido el casco urbano de Los Teques.",
         "seed": 1,
-        "base": {"lat": 10.344, "lon": -67.041},
+        "base": {"lat": UNEFA["lat"], "lon": UNEFA["lon"]},
         "swarms": [
             {"count": 8, "mode": "patrullaje", "nombre": "Patrulla Los Teques",
              "zona": {"lat": 10.3505, "lon": -67.0335, "radio_m": 1600}},
@@ -67,7 +67,7 @@ ESCENARIOS: dict[str, dict] = {
         "descripcion": "Tres enjambres supervisan simultáneamente la UNEFA Los Teques, "
                        "el Hospital Victorino Santaella y el Fuerte Tiuna.",
         "seed": 4,
-        "base": {"lat": 10.385, "lon": -66.985},
+        "base": {"lat": UNEFA["lat"], "lon": UNEFA["lon"]},
         "swarms": [
             {"count": 6, "mode": "patrullaje", "nombre": "Enjambre UNEFA",
              "zona": {"lat": UNEFA["lat"], "lon": UNEFA["lon"], "radio_m": 1200}},
