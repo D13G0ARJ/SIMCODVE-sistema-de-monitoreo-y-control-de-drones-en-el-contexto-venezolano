@@ -12,3 +12,16 @@ dist/
 # Editores
 .vscode/
 .idea/
+
+# Material de tesis y presentaciones (documentos, NO codigo)
+*.pdf
+*.docx
+*.doc
+*.odt
+*.pptx
+*.ppt
+/presentacion/
+/Capitulo_VI_diagramas/
+/Capitulo_VI.md
+/Capitulo_VI_docx.md
+# (frontend/src/assets/ se mantiene: son recursos de la app)
