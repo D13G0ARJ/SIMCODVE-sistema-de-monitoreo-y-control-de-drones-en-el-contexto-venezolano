@@ -5,7 +5,7 @@ export const GITHUB = {
   diego: 'https://github.com/D13G0ARJ',
   yoneiker: 'https://github.com/AlexanderAzocar',
   // Repositorio del proyecto SIMCODVE
-  repo: 'https://github.com/D13G0ARJ/SIMCED-Sistema-de-Simulaci-n-Monitoreo-y-Control-de-Enjambres-de-Drones',
+  repo: 'https://github.com/D13G0ARJ/SIMCODVE-sistema-de-monitoreo-y-control-de-drones-en-el-contexto-venezolano',
 }
 
 // Logo institucional (reemplazable: dejar el archivo en public/unefa.png)
