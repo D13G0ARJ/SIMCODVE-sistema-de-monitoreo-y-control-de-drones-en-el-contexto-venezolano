@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vercel
+
+# El .gitignore raíz ignora *.pdf; aquí re-incluimos el PDF de la tesis
+# porque es el archivo que descarga el botón de la landing.
+!public/*.pdf
