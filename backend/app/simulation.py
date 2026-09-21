@@ -46,9 +46,22 @@ BASE_DEFECTO = {"lat": 10.34915, "lon": -67.02262}   # UNEFA Nucleo Altos Mirand
 OMEGA_PATRULLA = 0.12            # velocidad angular del barrido (rad/s)
 CELDA_COBERTURA_M = 150.0        # lado de cada celda de la grilla de cobertura (m)
 MUESTREO_HISTORIAL_S = 5.0       # cada cuantos segundos (de simulacion) se guarda una muestra
-MARGEN_EVASION_M = 250.0         # banda fina de seguridad pegada al borde del jammer
-MARGEN_CORDON = 150.0            # a que distancia FUERA del borde rojo se ubica el objetivo
-PESO_EVASION = 2.5              # prioridad de la evasion de interferencia
+# --- Interferencia (jammer) ---
+# Geometria: el objetivo de un dron nunca se coloca dentro del rojo; se proyecta al
+# CORDON (radio + MARGEN_CORDON). La banda de evasion es MAS ESTRECHA que el cordon
+# (radio + MARGEN_EVASION_M < cordon), asi el objetivo es alcanzable sin que la
+# evasion lo "rebote": el dron se asienta en el cordon en vez de oscilar.
+MARGEN_CORDON = 220.0            # a que distancia FUERA del borde rojo se ubica el objetivo
+MARGEN_EVASION_M = 140.0         # banda de empuje suave pegada al borde rojo
+PESO_EVASION = 3.5               # prioridad de la evasion: supera a obj+ali+coh sumados
+VEL_DEGRADADO = 0.5              # fraccion de VEL_MAX bajo interferencia
+T_ANTICIPACION = 1.5             # s de "mirada adelante" para empezar a evadir a tiempo
+# Modelo de senal (%/s): cae dentro del rojo, se recupera fuera. El estado tiene
+# HISTERESIS: se degrada al entrar, y solo vuelve a ACTIVO cuando ya salio y la
+# senal supero SENAL_RECUPERADA (evita parpadeo activo<->degradado en el borde).
+SENAL_CAIDA = 60.0
+SENAL_SUBIDA = 40.0
+SENAL_RECUPERADA = 80.0
 
 # Modelo de direccion de Reynolds (steering behaviors):
 # cada comportamiento produce fuerza = velocidad_deseada - velocidad_actual,
@@ -86,6 +99,7 @@ class SimulationEngine:
         # celdas (grilla) ya visitadas por algun dron -> base de la metrica de cobertura
         self.cobertura: set[tuple[int, int]] = set()
         self.escenario_actual: str | None = None
+        self._afectados_enjambre: dict[str, int] = {}   # enjambre -> drones degradados (para alertas)
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
         self._cont_jam = _Contador()
@@ -137,6 +151,7 @@ class SimulationEngine:
         self._ultima_muestra = 0.0
         self.cobertura = set()
         self.escenario_actual = None
+        self._afectados_enjambre = {}
         self._cont_drone = _Contador()
         self._cont_swarm = _Contador()
         self._cont_jam = _Contador()
@@ -347,11 +362,17 @@ class SimulationEngine:
 
     def crear_jammer(self, lat: float, lon: float, radio_m: float = 1200.0) -> Jammer:
         jid = self._cont_jam.siguiente("JAM")
-        jam = Jammer(id=jid, lat=lat, lon=lon, radio_m=radio_m)
+        jam = Jammer(id=jid, lat=lat, lon=lon, radio_m=max(200.0, min(6000.0, radio_m)))
         self.jammers[jid] = jam
+        jam.afectados = sum(
+            1 for d in self.drones.values()
+            if d.status != DroneStatus.PERDIDO
+            and distancia_metros(d.lat, d.lon, lat, lon) <= jam.radio_m
+        )
+        detalle = f", {jam.afectados} unidades dentro" if jam.afectados else ""
         self._evento(
             "fallo",
-            f"Interferencia {jid} detectada en {lat:.5f}, {lon:.5f} (radio {round(radio_m)} m).",
+            f"Interferencia {jid} detectada en {lat:.5f}, {lon:.5f} (radio {round(jam.radio_m)} m{detalle}).",
             nivel="error",
         )
         return jam
@@ -406,11 +427,53 @@ class SimulationEngine:
         if radio_m is not None:
             j.radio_m = max(200.0, min(6000.0, radio_m))
 
-    def _en_interferencia(self, d: Drone) -> bool:
+    def _jammer_sobre(self, d: Drone) -> Jammer | None:
+        """Jammer dentro del cual esta el dron (el mas cercano a su centro), o None."""
+        mejor, mejor_d = None, 0.0
         for jam in self.jammers.values():
-            if distancia_metros(d.lat, d.lon, jam.lat, jam.lon) <= jam.radio_m:
-                return True
-        return False
+            dist = distancia_metros(d.lat, d.lon, jam.lat, jam.lon)
+            if dist <= jam.radio_m and (mejor is None or dist < mejor_d):
+                mejor, mejor_d = jam, dist
+        return mejor
+
+    def _actualizar_interferencia(self, activos: list[Drone], dt: float) -> None:
+        """Senal y estado de cada dron frente a las zonas de interferencia, con
+        histeresis, y alertas por enjambre al entrar/salir de interferencia."""
+        for jam in self.jammers.values():
+            jam.afectados = 0
+        for d in activos:
+            jam = self._jammer_sobre(d)
+            if jam is not None:
+                jam.afectados += 1
+                d.senal = max(0.0, d.senal - SENAL_CAIDA * dt)
+                d.status = DroneStatus.DEGRADADO
+            else:
+                d.senal = min(100.0, d.senal + SENAL_SUBIDA * dt)
+                if d.status == DroneStatus.DEGRADADO and d.senal >= SENAL_RECUPERADA:
+                    d.status = DroneStatus.ACTIVO
+
+        # alertas por enjambre: al empezar a sufrir interferencia y al recuperarse
+        conteo: dict[str, int] = {}
+        for d in activos:
+            if d.status == DroneStatus.DEGRADADO:
+                conteo[d.swarm_id] = conteo.get(d.swarm_id, 0) + 1
+        for sw in self.swarms.values():
+            ahora = conteo.get(sw.id, 0)
+            antes = self._afectados_enjambre.get(sw.id, 0)
+            if ahora and not antes:
+                self._evento(
+                    "interferencia",
+                    f"⚠ {sw.nombre}: {ahora} unidad(es) bajo interferencia, enlace degradado; "
+                    f"el enjambre evade la zona.",
+                    nivel="warn",
+                )
+            elif antes and not ahora:
+                self._evento(
+                    "interferencia",
+                    f"{sw.nombre}: enlace restablecido en todas sus unidades.",
+                    nivel="info",
+                )
+            self._afectados_enjambre[sw.id] = ahora
 
     # ------------------------------------------------------------------
     # Avance de la simulacion
@@ -420,14 +483,8 @@ class SimulationEngine:
         self.tiempo += total_dt
         activos = [d for d in self.drones.values() if d.status != DroneStatus.PERDIDO]
 
-        # 1) estado de enlace (mesh) e interferencia
-        for d in activos:
-            if self._en_interferencia(d):
-                d.status = DroneStatus.DEGRADADO
-                d.senal = max(0.0, d.senal - 8.0)
-            else:
-                d.status = DroneStatus.ACTIVO
-                d.senal = min(100.0, d.senal + 6.0)
+        # 1) estado de enlace (mesh) e interferencia (senal con histeresis + alertas)
+        self._actualizar_interferencia(activos, total_dt)
 
         self._calcular_mesh(activos)
         self._actualizar_cobertura(activos)   # marca las celdas pisadas este paso
@@ -619,13 +676,18 @@ class SimulationEngine:
         enjambre (modela una red mallada real entre grupos)."""
         for d in activos:
             d.vecinos = []
+            d.cercanos = []
         for i, a in enumerate(activos):
-            if a.status == DroneStatus.DEGRADADO:
-                continue
             for b in activos[i + 1:]:
-                if b.status == DroneStatus.DEGRADADO:
-                    continue
-                if distancia_metros(a.lat, a.lon, b.lat, b.lon) <= RANGO_COMUNICACION_M:
+                dist = distancia_metros(a.lat, a.lon, b.lat, b.lon)
+                # proximidad FISICA (anticolision): independiente del enlace, asi un
+                # dron degradado sigue evitando chocar aunque no tenga comunicacion
+                if dist < DIST_SEPARACION:
+                    a.cercanos.append(b.id)
+                    b.cercanos.append(a.id)
+                # enlace de COMUNICACION: solo entre drones con senal (no degradados)
+                if (a.status != DroneStatus.DEGRADADO and b.status != DroneStatus.DEGRADADO
+                        and dist <= RANGO_COMUNICACION_M):
                     a.vecinos.append(b.id)
                     b.vecinos.append(a.id)
 
@@ -635,7 +697,7 @@ class SimulationEngine:
         en_base = sw.zona is None   # sin mision: estacionado en la base
         idx_de = {m.id: i for i, m in enumerate(miembros)}  # posicion de cada dron
         for d in miembros:
-            vmax = VEL_MAX * (0.4 if d.status == DroneStatus.DEGRADADO else 1.0)
+            vmax = VEL_MAX * (VEL_DEGRADADO if d.status == DroneStatus.DEGRADADO else 1.0)
             w = self._pesos_modo(d.mode)
 
             # un dron que se alejo demasiado del objetivo deja de "hacer bandada"
@@ -643,64 +705,81 @@ class SimulationEngine:
             dist_obj = distancia_metros(d.lat, d.lon, objetivo.lat, objetivo.lon)
             en_formacion = dist_obj <= objetivo.radio_m + CORREA_EXTRA_M
 
-            # acumular vecindario (separacion con todos; alineacion/cohesion LOCAL del propio enjambre)
-            sep_x = sep_y = ali_x = ali_y = coh_x = coh_y = 0.0
-            n_flock = 0
-            for vid in d.vecinos:
+            # separacion FISICA con cualquier dron proximo (aunque no haya enlace)
+            sep_x = sep_y = 0.0
+            for vid in d.cercanos:
                 v = self.drones.get(vid)
                 if not v:
                     continue
                 ex, ey = offset_metros(d.lat, d.lon, v.lat, v.lon)  # dron -> vecino
                 dist = math.hypot(ex, ey) or 1.0
-                if dist < DIST_SEPARACION:
-                    sep_x -= ex / dist
-                    sep_y -= ey / dist
-                # alineacion/cohesion solo dentro del propio enjambre; en HIBRIDO,
-                # ademas solo con el MISMO anillo (misma paridad de indice), para que
-                # el anillo exterior (barrido) y el interior (defensa estatica) no se
-                # arrastren entre si y la formacion no se desestabilice ("cizalla").
-                if v.swarm_id == d.swarm_id:
-                    if d.mode == SwarmMode.HIBRIDO and \
-                            idx_de.get(v.id, 0) % 2 != idx_de.get(d.id, 0) % 2:
-                        continue
-                    ali_x += v.vx
-                    ali_y += v.vy
-                    coh_x += ex
-                    coh_y += ey
-                    n_flock += 1
+                sep_x -= ex / dist
+                sep_y -= ey / dist
 
-            ax = ay = 0.0
-            if sep_x or sep_y:                              # separacion (siempre)
-                sx, sy = self._steer(sep_x, sep_y, d.vx, d.vy, vmax)
-                ax += sx * w["sep"]; ay += sy * w["sep"]
-            # alineacion/cohesion solo en mision (estacionados no "hacen bandada")
-            if n_flock and en_formacion and not en_base:
-                sx, sy = self._steer(ali_x, ali_y, d.vx, d.vy, vmax)
-                ax += sx * w["ali"]; ay += sy * w["ali"]
-                sx, sy = self._seek(coh_x / n_flock, coh_y / n_flock, d.vx, d.vy, vmax)
-                ax += sx * w["coh"]; ay += sy * w["coh"]
+            # alineacion/cohesion LOCAL: solo con vecinos ENLAZADOS del propio enjambre.
+            # En HIBRIDO, ademas solo con el MISMO anillo (misma paridad de indice), para
+            # que el anillo exterior (barrido) y el interior (defensa estatica) no se
+            # arrastren entre si y la formacion no se desestabilice ("cizalla").
+            ali_x = ali_y = coh_x = coh_y = 0.0
+            n_flock = 0
+            for vid in d.vecinos:
+                v = self.drones.get(vid)
+                if not v or v.swarm_id != d.swarm_id:
+                    continue
+                if d.mode == SwarmMode.HIBRIDO and \
+                        idx_de.get(v.id, 0) % 2 != idx_de.get(d.id, 0) % 2:
+                    continue
+                ex, ey = offset_metros(d.lat, d.lon, v.lat, v.lon)
+                ali_x += v.vx
+                ali_y += v.vy
+                coh_x += ex
+                coh_y += ey
+                n_flock += 1
 
-            # objetivo: en mision -> anillo del modo; en base -> plaza de estacionamiento fija
+            # objetivo: en mision -> anillo del modo; en base -> plaza de estacionamiento.
+            # Ambos ya vienen proyectados FUERA de cualquier interferencia (al cordon).
             if en_base:
                 ox, oy = self._objetivo_base(d, miembros)
             else:
                 ox, oy = self._objetivo_modo(d, objetivo, miembros)
-            sx, sy = self._seek(ox, oy, d.vx, d.vy, vmax, llegada=True)
-            ax += sx * w["obj"]; ay += sy * w["obj"]
 
-            # evasion de interferencia (prioridad alta: nunca entrar al rojo)
-            ev_x = ev_y = 0.0
-            for jam in self.jammers.values():
-                jx, jy = offset_metros(d.lat, d.lon, jam.lat, jam.lon)
-                dj = math.hypot(jx, jy) or 1.0
-                limite = jam.radio_m + MARGEN_EVASION_M
-                if dj < limite:
-                    f = (limite - dj) / limite
-                    ev_x -= jx / dj * f
-                    ev_y -= jy / dj * f
-            if ev_x or ev_y:
+            # evasion de interferencia: direccion de escape y profundidad (0 = fuera
+            # de la banda, 1 = dentro del rojo)
+            ev_x, ev_y, prof = self._evasion(d, ox, oy)
+            dentro_rojo = prof >= 1.0
+
+            ax = ay = 0.0
+            if sep_x or sep_y:                              # separacion (siempre)
+                sx, sy = self._steer(sep_x, sep_y, d.vx, d.vy, vmax)
+                # al bordear una interferencia todos rodean por el mismo lado y se
+                # amontonan en el cordon: la separacion pesa mas ahi
+                k_sep = w["sep"] * (1.5 if prof > 0.0 else 1.0)
+                ax += sx * k_sep; ay += sy * k_sep
+
+            if dentro_rojo:
+                # DENTRO del rojo: salir es la unica prioridad (sin objetivo ni bandada,
+                # que podrian arrastrarlo mas adentro). Sale por la radial mas corta.
                 sx, sy = self._steer(ev_x, ev_y, d.vx, d.vy, vmax)
                 ax += sx * PESO_EVASION; ay += sy * PESO_EVASION
+            else:
+                # alineacion/cohesion solo en mision (estacionados no "hacen bandada")
+                if n_flock and en_formacion and not en_base:
+                    sx, sy = self._steer(ali_x, ali_y, d.vx, d.vy, vmax)
+                    ax += sx * w["ali"]; ay += sy * w["ali"]
+                    # sin cohesion dentro de la banda de seguridad: al rodear una
+                    # interferencia el centro del grupo queda DENTRO del rojo y la
+                    # cohesion empujaria a los drones contra el borde
+                    if prof <= 0.0:
+                        sx, sy = self._seek(coh_x / n_flock, coh_y / n_flock, d.vx, d.vy, vmax)
+                        ax += sx * w["coh"]; ay += sy * w["coh"]
+                sx, sy = self._seek(ox, oy, d.vx, d.vy, vmax, llegada=True)
+                ax += sx * w["obj"]; ay += sy * w["obj"]
+                if prof > 0.0:
+                    # en la banda de seguridad: empuje que crece con la profundidad y
+                    # que RODEA (componente tangencial) cuando el objetivo esta detras
+                    sx, sy = self._steer(ev_x, ev_y, d.vx, d.vy, vmax)
+                    peso = PESO_EVASION * (0.35 + 0.65 * prof)
+                    ax += sx * peso; ay += sy * peso
 
             # integrar: la fuerza ya es (vel_deseada - vel_actual), no hace falta amortiguar
             d.vx += ax * dt
@@ -758,6 +837,67 @@ class SimulationEngine:
             sy = sy / sl * MAX_FUERZA
         return sx, sy
 
+    def _evasion(self, d: Drone, ox: float, oy: float) -> tuple[float, float, float]:
+        """Direccion de evasion (este, norte, sin normalizar) y profundidad 0..1.
+
+        - Fuera de la banda (radio + MARGEN_EVASION_M): (0, 0, 0).
+        - En la banda: empuje radial que crece hacia el rojo, mas una componente
+          TANGENCIAL para rodear el jammer por el lado corto cuando el punto
+          objetivo (ox, oy: relativo al dron) queda detras de la interferencia.
+        - Dentro del rojo: radial pura hacia afuera, profundidad 1.
+        """
+        ev_x = ev_y = 0.0
+        prof = 0.0
+        do = math.hypot(ox, oy)
+        for jam in self.jammers.values():
+            jx, jy = offset_metros(d.lat, d.lon, jam.lat, jam.lon)  # dron -> jammer
+            dj = math.hypot(jx, jy) or 1.0
+            if dj <= jam.radio_m:
+                # DENTRO del rojo: radial pura, profundidad maxima
+                prof = 1.0
+                ev_x -= jx / dj
+                ev_y -= jy / dj
+                continue
+            # ANTICIPACION: si vuela hacia el jammer, evalua la banda con la distancia
+            # que tendra dentro de T_ANTICIPACION s (evita "clavarse" por inercia)
+            v_hacia = (d.vx * jx + d.vy * jy) / dj
+            dj_eff = dj - max(0.0, v_hacia) * T_ANTICIPACION
+            borde = jam.radio_m + MARGEN_EVASION_M
+            if dj_eff >= borde:
+                continue
+            f = min(1.0, (borde - dj_eff) / MARGEN_EVASION_M)  # 0 borde exterior .. 1 rojo
+            prof = max(prof, f)
+            rx, ry = -jx / dj, -jy / dj                       # radial hacia afuera
+            tx = ty = 0.0
+            if do > 1.0:
+                hacia = (ox * jx + oy * jy) / (do * dj)      # coseno objetivo-jammer
+                if hacia > 0.3:                              # el objetivo esta "detras"
+                    lado = 1.0 if (jx * oy - jy * ox) >= 0 else -1.0
+                    tx, ty = -jy / dj * lado, jx / dj * lado  # tangente hacia el objetivo
+            # la radial nunca baja de la mitad (frena la entrada aun en el borde exterior)
+            fr = 0.5 + 0.5 * f
+            ev_x += rx * fr + tx * (1.0 - f)
+            ev_y += ry * fr + ty * (1.0 - f)
+        return ev_x, ev_y, prof
+
+    def _proyectar_fuera(self, d: Drone, oe: float, on: float) -> tuple[float, float]:
+        """Si el punto objetivo (relativo al dron) cae dentro de una interferencia, lo
+        PROYECTA al cordon seguro (mismo rumbo desde el jammer, a radio + MARGEN_CORDON).
+        Asi el dron va al borde exterior en lugar de adentro y, como cada dron tiene su
+        propio angulo, el enjambre se reparte uniformemente alrededor de la zona roja."""
+        for jam in self.jammers.values():
+            jx, jy = offset_metros(d.lat, d.lon, jam.lat, jam.lon)  # dron -> jammer
+            tx, ty = oe - jx, on - jy                              # jammer -> objetivo
+            dtj = math.hypot(tx, ty)
+            rsafe = jam.radio_m + MARGEN_CORDON
+            if dtj < rsafe:
+                if dtj < 1.0:
+                    # objetivo justo en el centro: usar el rumbo dron->jammer como referencia
+                    tx, ty, dtj = -jx, -jy, math.hypot(jx, jy) or 1.0
+                k = rsafe / dtj
+                oe, on = jx + tx * k, jy + ty * k
+        return oe, on
+
     def _objetivo_base(self, d: Drone, miembros: list[Drone]) -> tuple[float, float]:
         """Plaza de estacionamiento FIJA en la base: cada dron a su slot, y se detiene."""
         n = max(1, len(miembros))
@@ -765,7 +905,7 @@ class SimulationEngine:
         ang = 2 * math.pi * idx / n
         r = self.base.radio_m * 0.6
         este, norte = offset_metros(d.lat, d.lon, self.base.lat, self.base.lon)  # dron -> base
-        return este + math.cos(ang) * r, norte + math.sin(ang) * r
+        return self._proyectar_fuera(d, este + math.cos(ang) * r, norte + math.sin(ang) * r)
 
     def _objetivo_modo(self, d: Drone, zona: Zone, miembros: list[Drone]) -> tuple[float, float]:
         """
@@ -803,25 +943,9 @@ class SimulationEngine:
                 r = zona.radio_m * 0.5
                 ang = ang_base
 
-        # punto objetivo sobre el anillo, relativo al dron = (dron->centro) + (centro->punto)
-        objetivo_e = este + math.cos(ang) * r
-        objetivo_n = norte + math.sin(ang) * r
-
-        # Si el punto objetivo cae dentro de una zona de interferencia, se PROYECTA
-        # al borde seguro (mismo rumbo desde el jammer, a rsafe). Asi el dron va al
-        # borde rojo en lugar de adentro, y como cada dron tiene su propio angulo,
-        # el enjambre se reparte de forma uniforme alrededor de la interferencia.
-        for jam in self.jammers.values():
-            jx, jy = offset_metros(d.lat, d.lon, jam.lat, jam.lon)  # dron -> jammer
-            tx, ty = objetivo_e - jx, objetivo_n - jy              # jammer -> punto objetivo
-            dtj = math.hypot(tx, ty) or 1.0
-            rsafe = jam.radio_m + MARGEN_CORDON
-            if dtj < rsafe:
-                k = rsafe / dtj
-                objetivo_e = jx + tx * k
-                objetivo_n = jy + ty * k
-
-        return objetivo_e, objetivo_n   # PUNTO objetivo relativo al dron (sin normalizar)
+        # punto objetivo sobre el anillo, relativo al dron = (dron->centro) + (centro->punto),
+        # proyectado fuera de cualquier interferencia (cordon)
+        return self._proyectar_fuera(d, este + math.cos(ang) * r, norte + math.sin(ang) * r)
 
     @staticmethod
     def _pesos_modo(mode: SwarmMode) -> dict[str, float]:

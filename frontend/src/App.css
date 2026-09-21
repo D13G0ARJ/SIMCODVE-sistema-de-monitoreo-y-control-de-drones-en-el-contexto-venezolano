@@ -354,6 +354,31 @@
   background: rgba(6, 16, 31, 0.7);
 }
 
+/* Editor flotante de zona / interferencia (abajo a la derecha del mapa) */
+.editor-flotante {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  z-index: 1250;
+  width: 250px;
+  background: rgba(11, 18, 32, 0.94);
+  border: 1px solid var(--ec, var(--line));
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  color: var(--txt);
+}
+.ef-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.ef-head strong { flex: 1; font-size: 12px; }
+.ef-punto { width: 9px; height: 9px; border-radius: 50%; background: var(--ec, var(--acc)); box-shadow: 0 0 6px var(--ec, var(--acc)); }
+.ef-cerrar {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-size: 13px; padding: 0 2px;
+}
+.ef-cerrar:hover { color: var(--txt); }
+.editor-flotante .btn { width: 100%; }
+
 /* Handle arrastrable de zonas / jammers */
 .handle-icon { background: none; border: none; }
 .zona-handle {

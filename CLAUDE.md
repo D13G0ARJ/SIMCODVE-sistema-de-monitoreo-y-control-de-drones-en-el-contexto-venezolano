@@ -91,9 +91,18 @@ Key behaviors to keep in mind when editing the engine:
 - The mesh (`_calcular_mesh`) is **global** across swarms — any drone in
   `RANGO_COMUNICACION_M` links. But alignment/cohesion only apply within the
   same `swarm_id`; only separation crosses swarms (collision avoidance).
-- Fault injection: `eliminar_nodo` sets status `PERDIDO` (dropped from swarm);
-  a `Jammer` zone sets drones inside to `DEGRADADO` (signal drops, speed
-  halved). `pct_operativo` in metrics = % of drones still `ACTIVO`.
+- Fault injection: `eliminar_nodo` sets status `PERDIDO` (dropped from swarm).
+  A `Jammer` zone degrades drones inside (`_actualizar_interferencia`): signal
+  falls at `SENAL_CAIDA` %/s, status `DEGRADADO` with **hysteresis** (back to
+  `ACTIVO` only once outside and signal ≥ `SENAL_RECUPERADA`), speed ×
+  `VEL_DEGRADADO`, no comms links (but still physical separation via
+  `d.cercanos`). Per-swarm events fire on entering/leaving interference, and
+  `jammer.afectados` is exported as `n_afectados`. Avoidance (`_evasion`):
+  objectives are projected to the **cordon** (`radio + MARGEN_CORDON`), the
+  push band (`MARGEN_EVASION_M`) is narrower than the cordon so the target is
+  reachable without oscillation, with velocity look-ahead (`T_ANTICIPACION`)
+  and a tangential component to go around; inside the red zone only
+  separation + radial escape act. `pct_operativo` = % of drones still `ACTIVO`.
 - `dividir_enjambre` splits members round-robin into N sub-swarms, each getting
   its **own copy** of the zona (never share the `Zone` object — radius edits
   would leak across sub-swarms).

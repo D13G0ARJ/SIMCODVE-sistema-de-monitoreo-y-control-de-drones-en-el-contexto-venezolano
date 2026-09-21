@@ -41,8 +41,8 @@ Frontend (React + Vite + Leaflet)        Backend (FastAPI + Uvicorn)
 - **backend/** — Python + FastAPI. Aloja el `SimulationEngine` (única instancia en
   memoria, sin base de datos). Una tarea de fondo llama a `engine.step()` cada `DT`
   (0,1 s ≈ **10 Hz**) y transmite `engine.snapshot()` a todos los clientes WebSocket.
-- **frontend/** — React + Vite + Leaflet (satélite Esri, calles OpenStreetMap/CartoDB,
-  geocodificación Nominatim).
+- **frontend/** — React + Vite + Leaflet (satélite y lienzo oscuro de Esri, calles
+  OpenStreetMap, geocodificación Nominatim; ningún proveedor requiere API key).
 
 ### Pila tecnológica
 | Capa     | Tecnología                              |

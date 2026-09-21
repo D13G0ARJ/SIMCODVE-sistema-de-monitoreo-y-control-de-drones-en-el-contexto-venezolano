@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import csv
 import io
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -54,7 +55,11 @@ class GestorConexiones:
 
     async def difundir(self, mensaje: dict) -> None:
         muertos = []
-        for ws in self.activos:
+        # Copia del conjunto: mientras se espera un envio puede conectarse o
+        # desconectarse otro cliente (reconexion del navegador) y mutar el set;
+        # iterar el set original lanza "Set changed size during iteration" y
+        # mataria la tarea de fondo (la simulacion quedaria congelada).
+        for ws in list(self.activos):
             try:
                 await ws.send_json(mensaje)
             except Exception:
@@ -67,10 +72,17 @@ gestor = GestorConexiones()
 
 
 async def bucle_simulacion() -> None:
+    # El bucle NUNCA debe morir: cualquier error en un paso se registra y se
+    # sigue en el siguiente tick (un fallo puntual no congela la simulacion).
     while True:
-        if not engine.pausado:
-            engine.step()
-        await gestor.difundir(engine.snapshot())
+        try:
+            if not engine.pausado:
+                engine.step()
+            await gestor.difundir(engine.snapshot())
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.getLogger("simcodve").exception("Error en el bucle de simulacion")
         await asyncio.sleep(DT)
 
 

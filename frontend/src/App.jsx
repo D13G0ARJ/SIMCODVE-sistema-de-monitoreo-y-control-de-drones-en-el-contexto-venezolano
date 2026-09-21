@@ -25,6 +25,7 @@ export default function App() {
   const [conteoNuevo, setConteoNuevo] = useState(6);
   const [radar, setRadar] = useState(false);
   const [jammerSel, setJammerSel] = useState(null);
+  const [zonaSel, setZonaSel] = useState(null);       // id del enjambre cuya zona se edita
   const [escenarios, setEscenarios] = useState([]);
   const [modalEsc, setModalEsc] = useState(false);
   const [cargandoEsc, setCargandoEsc] = useState(null); // nombre del escenario en carga
@@ -49,10 +50,15 @@ export default function App() {
     const h = herramientaRef.current;
     const { enjambreSel } = selRef.current;
     if (h === "jammer") {
-      await api.crearJammer(latlng.lat, latlng.lng, 1200);
+      // se coloca UNA interferencia por clic; la herramienta vuelve a normal y la
+      // nueva zona queda seleccionada (panel con radio y boton de quitar)
+      const r = await api.crearJammer(latlng.lat, latlng.lng, 1200);
+      setHerramienta("normal");
+      if (r?.jammer?.id) { setJammerSel(r.jammer.id); setZonaSel(null); }
     } else if (h === "zona" && enjambreSel) {
       await api.asignarZona(enjambreSel, latlng.lat, latlng.lng, 1500);
       setHerramienta("normal");
+      setZonaSel(enjambreSel); setJammerSel(null);   // abre el editor de la zona recien creada
     } else if (h === "base") {
       await api.setBase(latlng.lat, latlng.lng);
       setHerramienta("normal");
@@ -96,6 +102,7 @@ export default function App() {
   const jammerVivo = jammerSel
     ? snapshot?.jammers.find((j) => j.id === jammerSel)
     : null;
+  const zonaVivaSw = zonaSel ? swarms.find((s) => s.id === zonaSel && s.zona) : null;
 
   const verVenezuela = () => window.__simcedMap?.fitBounds(VENEZUELA_BOUNDS);
   const centrarBase = () => {
@@ -260,21 +267,6 @@ export default function App() {
             </Seccion>
           )}
 
-          {jammerVivo && (
-            <Seccion titulo={`Interferencia ${jammerVivo.id}`}>
-              <label className="campo">
-                Radio: {Math.round(jammerVivo.radio_m)} m
-                <input type="range" min="300" max="4000" step="100"
-                  value={jammerVivo.radio_m}
-                  onChange={(e) => api.actualizarJammer(jammerVivo.id, { radio_m: +e.target.value })} />
-              </label>
-              <p className="ayuda">Arrastra el ✛ en el mapa para moverla.</p>
-              <Boton danger onClick={() => { api.quitarJammer(jammerVivo.id); setJammerSel(null); }}>
-                ✕ Quitar interferencia
-              </Boton>
-            </Seccion>
-          )}
-
         </aside>
 
         <main className="mapa-wrap">
@@ -284,10 +276,60 @@ export default function App() {
             onMapClick={onMapClick}
             onDronClick={onDronClick}
             onZonaMove={(id, lat, lon) => api.moverZona(id, lat, lon)}
-            onZonaClick={(id) => { setEnjambreSel(id); setDronSel(null); setJammerSel(null); }}
+            onZonaClick={(id) => { setEnjambreSel(id); setDronSel(null); setJammerSel(null); setZonaSel(id); }}
             onJammerMove={(id, lat, lon) => api.actualizarJammer(id, { lat, lon })}
-            onJammerClick={(id) => setJammerSel(id)}
+            onJammerClick={(id) => { setJammerSel(id); setZonaSel(null); }}
           />
+          {/* Editor flotante: se abre al hacer clic en una zona asignada o en una interferencia */}
+          {zonaVivaSw && (
+            <div className="editor-flotante" style={{ "--ec": zonaVivaSw.color }}>
+              <div className="ef-head">
+                <span className="ef-punto" />
+                <strong>Zona · {zonaVivaSw.nombre}</strong>
+                <button className="ef-cerrar" onClick={() => setZonaSel(null)} title="Cerrar">✕</button>
+              </div>
+              <label className="campo">
+                Radio: {Math.round(zonaVivaSw.zona.radio_m)} m
+                <input type="range" min="500" max="5000" step="100"
+                  value={zonaVivaSw.zona.radio_m}
+                  onChange={(e) => api.setRadio(zonaVivaSw.id, +e.target.value)} />
+              </label>
+              <p className="ayuda" style={{ margin: "0 0 8px" }}>Arrastra el ✛ del centro para mover la zona.</p>
+              <div className="grid2">
+                <Boton onClick={() => window.__simcedMap?.setView([zonaVivaSw.zona.lat, zonaVivaSw.zona.lon], 13)}>
+                  ⊙ Centrar
+                </Boton>
+                <Boton danger onClick={() => { api.retornarBase(zonaVivaSw.id); setZonaSel(null); }}>
+                  🏠 Quitar zona (ir a base)
+                </Boton>
+              </div>
+            </div>
+          )}
+          {jammerVivo && (
+            <div className="editor-flotante" style={{ "--ec": "#ef4444" }}>
+              <div className="ef-head">
+                <span className="ef-punto" />
+                <strong>Interferencia {jammerVivo.id}</strong>
+                <button className="ef-cerrar" onClick={() => setJammerSel(null)} title="Cerrar">✕</button>
+              </div>
+              <p className="ayuda" style={{ margin: "0 0 6px" }}>
+                Unidades afectadas ahora:{" "}
+                <strong style={{ color: jammerVivo.n_afectados ? "var(--danger)" : "var(--txt)" }}>
+                  {jammerVivo.n_afectados ?? 0}
+                </strong>
+              </p>
+              <label className="campo">
+                Radio: {Math.round(jammerVivo.radio_m)} m
+                <input type="range" min="300" max="4000" step="100"
+                  value={jammerVivo.radio_m}
+                  onChange={(e) => api.actualizarJammer(jammerVivo.id, { radio_m: +e.target.value })} />
+              </label>
+              <p className="ayuda" style={{ margin: "0 0 8px" }}>Arrastra el ✛ del centro para moverla.</p>
+              <Boton danger onClick={() => { api.quitarJammer(jammerVivo.id); setJammerSel(null); }}>
+                ✕ Quitar interferencia
+              </Boton>
+            </div>
+          )}
           {radar && <Radar snapshot={snapshot} />}
           {pausado && <div className="pausa-ind">⏸ PAUSA</div>}
           <div className="vista-toggle">

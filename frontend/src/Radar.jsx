@@ -42,9 +42,11 @@ export default function Radar({ snapshot }) {
       boxZoom: false, keyboard: false, touchZoom: false,
       fadeAnimation: false, zoomAnimation: false, inertia: false,
     }).setView([10.34915, -67.02262], 13);
+    // Fondo oscuro sin etiquetas (Esri Dark Gray Canvas, sin API key).
+    // CARTO (basemaps.cartocdn.com) ahora exige clave y devuelve "API KEY REQUIRED".
     L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png",
-      { maxZoom: 19, opacity: 0.95 }
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, maxNativeZoom: 16, opacity: 0.95 }
     ).addTo(lmap);
     lmapRef.current = lmap;
 

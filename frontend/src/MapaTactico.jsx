@@ -58,7 +58,9 @@ export default function MapaTactico({
     window.__simcedMap = m;
   }, []);
 
+  const herramientaRef = useRef(herramienta);
   useEffect(() => {
+    herramientaRef.current = herramienta;
     if (!contenedor.current) return;
     contenedor.current.style.cursor = herramienta === "normal" ? "grab" : "crosshair";
   }, [herramienta]);
@@ -73,9 +75,13 @@ export default function MapaTactico({
     const h = L.marker([lat, lon], { icon: icono, draggable: true });
     h.on("dragstart", () => { arrastrando.current = claveArrastre; });
     h.on("drag", (e) => { h._circuloAsociado?.setLatLng(e.latlng); });
-    h.on("dragend", (e) => {
-      arrastrando.current = null;
-      onMove(e.latlng.lat, e.latlng.lng);
+    h.on("dragend", () => {
+      // OJO: el evento dragend de Leaflet NO trae latlng (solo distance);
+      // la posicion final se lee del propio marcador. Se envia al backend y
+      // solo despues se libera el bloqueo, para que el siguiente snapshot no
+      // devuelva el circulo a la posicion vieja antes de que el motor la cambie.
+      const ll = h.getLatLng();
+      Promise.resolve(onMove(ll.lat, ll.lng)).finally(() => { arrastrando.current = null; });
     });
     if (onClickSel) h.on("click", (e) => { L.DomEvent.stop(e); onClickSel(); });
     return h;
@@ -150,15 +156,21 @@ export default function MapaTactico({
       const { lat, lon, radio_m } = s.zona;
       let obj = zonaObjs.current[s.id];
       if (!obj) {
+        // el circulo de la zona es CLICABLE (abre el editor); con otra herramienta
+        // activa el clic se trata como clic normal sobre el mapa
         const circle = L.circle([lat, lon], {
           radius: radio_m, color: s.color, weight: 1.5,
-          fillColor: s.color, fillOpacity: 0.07, dashArray: "6 6", interactive: false,
+          fillColor: s.color, fillOpacity: 0.07, dashArray: "6 6", bubblingMouseEvents: false,
         }).addTo(zonas);
+        circle.on("click", (e) => {
+          if (herramientaRef.current === "normal") cbRef.current.onZonaClick(s.id);
+          else cbRef.current.onMapClick(e.latlng);
+        });
         const handle = crearHandle(lat, lon, s.color, "z:" + s.id,
           (la, lo) => cbRef.current.onZonaMove(s.id, la, lo),
           () => cbRef.current.onZonaClick(s.id));
         handle._circuloAsociado = circle;
-        handle.bindTooltip(`${s.nombre} · arrastra para mover, clic para editar`, { direction: "top" });
+        handle.bindTooltip(`${s.nombre} · arrastra ✛ para mover · clic para editar la zona`, { direction: "top" });
         handle.addTo(zonas);
         obj = zonaObjs.current[s.id] = { circle, handle };
       } else if (arrastrando.current !== "z:" + s.id) {
@@ -184,15 +196,22 @@ export default function MapaTactico({
       jamsActuales.add(j.id);
       let obj = jamObjs.current[j.id];
       if (!obj) {
+        // el circulo rojo es CLICABLE para seleccionar la interferencia (la cruz
+        // central es muy pequena); con otra herramienta activa, el clic se
+        // trata como clic normal sobre el mapa (p.ej. asignar zona dentro del rojo)
         const circle = L.circle([j.lat, j.lon], {
           radius: j.radio_m, color: "#ef4444", weight: 2,
-          fillColor: "#ef4444", fillOpacity: 0.18, interactive: false,
+          fillColor: "#ef4444", fillOpacity: 0.18, bubblingMouseEvents: false,
         }).addTo(jammers);
+        circle.on("click", (e) => {
+          if (herramientaRef.current === "normal") cbRef.current.onJammerClick(j.id);
+          else cbRef.current.onMapClick(e.latlng);
+        });
         const handle = crearHandle(j.lat, j.lon, "#ef4444", "j:" + j.id,
           (la, lo) => cbRef.current.onJammerMove(j.id, la, lo),
           () => cbRef.current.onJammerClick(j.id));
         handle._circuloAsociado = circle;
-        handle.bindTooltip(`${j.id} · arrastra o clic para editar`, { direction: "top" });
+        handle.bindTooltip(`${j.id} · arrastra ✛ para mover · clic para editar`, { direction: "top" });
         handle.addTo(jammers);
         obj = jamObjs.current[j.id] = { circle, handle };
       } else if (arrastrando.current !== "j:" + j.id) {

@@ -64,6 +64,7 @@ class Drone:
     vx: float = 0.0
     vy: float = 0.0
     vecinos: list[str] = field(default_factory=list)  # ids con enlace mesh activo
+    cercanos: list[str] = field(default_factory=list) # ids fisicamente proximos (anticolision)
     cargando: bool = False                            # esta recargando en la base
 
     def to_dict(self) -> dict:
@@ -114,6 +115,7 @@ class Jammer:
     lat: float
     lon: float
     radio_m: float = 1200.0
+    afectados: int = 0    # drones actualmente dentro (lo actualiza el motor en cada paso)
 
     def to_dict(self) -> dict:
         return {
@@ -121,6 +123,7 @@ class Jammer:
             "lat": self.lat,
             "lon": self.lon,
             "radio_m": self.radio_m,
+            "n_afectados": self.afectados,
         }
 
 
