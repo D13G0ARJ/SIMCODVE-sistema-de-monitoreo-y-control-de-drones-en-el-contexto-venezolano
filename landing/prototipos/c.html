@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIMCODVE</title>
+<meta name="description" content="SIMCODVE: prototipo académico que simula enjambres de drones con control descentralizado sobre el mapa real de Venezuela. Trabajo Especial de Grado, UNEFA 2026.">
+<meta name="theme-color" content="#070B14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
+<style>
+/* ------------------------------------------------------------------
+   Prototipo C, "Enjambre vivo".
+   Sistema de radios: botones píldora (999px) y superficies 16px.
+   Un solo acento (cian). El rojo solo existe como semántica de nodo
+   degradado dentro del enjambre, nunca en la interfaz.
+   CSS base para 390px; se amplía en 768px y 1100px.
+------------------------------------------------------------------- */
+:root{
+  --fondo:#070B14;
+  --superficie:#0E1726;
+  --texto:#E6EDF7;
+  --texto2:#A7B6CC;
+  --linea:rgba(140,160,184,.14);
+  --linea2:rgba(140,160,184,.32);
+  --acento:#22D3EE;
+  --acento-claro:#67E3F4;
+  --gutter:20px;
+  --nav:64px;
+  --r-boton:999px;
+  --r-superficie:16px;
+  --sora:'Sora',system-ui,sans-serif;
+  --manrope:'Manrope',system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{
+  background:var(--fondo);
+  color:var(--texto);
+  scroll-padding-top:calc(var(--nav) + 8px);
+  -webkit-text-size-adjust:100%;
+  scrollbar-color:#2A3B55 var(--fondo);
+}
+@media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth} }
+body{
+  margin:0;
+  font:400 16px/1.55 var(--manrope);
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:var(--fondo);
+}
+::selection{background:var(--acento);color:var(--fondo)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--fondo)}
+::-webkit-scrollbar-thumb{background:#2A3B55;border-radius:999px;border:2px solid var(--fondo)}
+a{color:var(--acento);text-underline-offset:.22em;text-decoration-thickness:1px}
+img{display:block;max-width:100%;height:auto}
+h1,h2,h3{font-family:var(--sora);margin:0;text-wrap:balance}
+p{margin:0}
+:focus-visible{outline:2px solid var(--acento);outline-offset:3px;border-radius:4px}
+
+/* Enjambre de fondo */
+#enjambre{position:fixed;inset:0;z-index:0;width:100%;height:100%;display:block;pointer-events:none}
+.sin-webgl #enjambre{display:none}
+.sin-webgl .hero{
+  background:
+    linear-gradient(to top, rgba(7,11,20,.96) 0%, rgba(7,11,20,.7) 45%, rgba(7,11,20,.35) 100%),
+    url('/sistema/webp/g10_radar-p.webp') center / cover no-repeat;
+}
+
+main,.nav,.barra,footer{position:relative;z-index:1}
+.in{width:100%;max-width:1180px;margin-inline:auto;padding-inline:var(--gutter)}
+.mono{font-family:var(--mono);font-size:.85rem;font-weight:400;letter-spacing:0;color:var(--texto2)}
+.secundario{color:var(--texto2)}
+h2{font-size:clamp(1.6rem,5.6vw,2.5rem);line-height:1.1;letter-spacing:-.02em;font-weight:600}
+.seccion{padding-block:4rem}
+
+/* Botones */
+.boton{
+  display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  min-height:48px;padding:0 1.35rem;border-radius:var(--r-boton);
+  font:600 .95rem/1 var(--manrope);text-decoration:none;white-space:nowrap;
+  transition:background-color .2s,border-color .2s,color .2s,transform .15s;
+}
+.boton i{font-size:1.15rem}
+.primario{background:var(--acento);color:var(--fondo)}
+.primario:hover{background:var(--acento-claro)}
+.fantasma{border:1px solid var(--linea2);color:var(--texto)}
+.fantasma:hover{border-color:var(--acento);color:var(--acento)}
+.boton:active{transform:scale(.98)}
+.acciones{display:flex;flex-wrap:wrap;gap:.75rem}
+
+/* Navegación */
+.nav{position:fixed;top:0;left:0;right:0;height:var(--nav);z-index:6;transition:background-color .3s,border-color .3s;border-bottom:1px solid transparent}
+.nav.solida{background:rgba(7,11,20,.74);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:var(--linea)}
+.nav-in{height:100%;display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.marca{display:flex;align-items:center;gap:.65rem;color:var(--texto);text-decoration:none;font:700 1.02rem var(--sora);letter-spacing:.01em}
+.marca img{width:auto;height:32px}
+.nav-enlaces,.nav-cta{display:none}
+
+/* Barra inferior móvil */
+.barra{
+  position:fixed;left:0;right:0;bottom:0;z-index:6;
+  padding:10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  background:rgba(7,11,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--linea);
+  transform:translateY(110%);transition:transform .35s cubic-bezier(.2,.7,.2,1);
+}
+.barra.ver{transform:none}
+.barra .boton{width:100%}
+
+/* Hero */
+.hero{
+  position:relative;min-height:100dvh;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:6rem 0 2.5rem;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(95% 62% at 38% 100%, rgba(7,11,20,.55) 0%, rgba(7,11,20,.55) 42%, rgba(7,11,20,0) 100%);
+}
+.hero .in{position:relative}
+.hero h1{
+  font-size:clamp(2.2rem,8.5vw,4.6rem);line-height:1.04;letter-spacing:-.03em;font-weight:600;
+  margin:.85rem 0 1.1rem;max-width:12.5ch;
+}
+.hero .lin{display:block;overflow:hidden;padding-bottom:.12em;margin-bottom:-.12em}
+.hero .lin-in{display:block;will-change:transform}
+.hero .lead{font-size:1.06rem;color:var(--texto2);max-width:40ch;margin-bottom:1.5rem}
+
+/* El problema: escenas sobre el enjambre */
+.historia .pegado{padding:5rem 0 2rem}
+.escena{padding:1.25rem 0}
+.escena h2{font-size:clamp(1.7rem,6.5vw,3rem);line-height:1.08;letter-spacing:-.025em;margin-bottom:.8rem;max-width:14ch}
+.escena p{font-size:1.06rem;color:var(--texto2);max-width:42ch}
+.historia.js{min-height:260dvh}
+.historia.js .pegado{position:sticky;top:0;height:100dvh;padding:0;overflow:hidden}
+.historia.js .escena{
+  position:absolute;inset:0;display:flex;align-items:flex-end;
+  padding:0 0 calc(92px + env(safe-area-inset-bottom));
+  will-change:transform,opacity;
+}
+.historia.js .escena::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(95% 62% at 38% 100%, rgba(7,11,20,.55) 0%, rgba(7,11,20,.55) 42%, rgba(7,11,20,0) 100%);
+}
+.historia.js .escena .in{position:relative}
+
+.raices{background:rgba(7,11,20,.85);border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
+.raices .intro{font-size:1.06rem;color:var(--texto2);max-width:60ch;margin-top:1rem}
+.raices-lista{list-style:none;margin:2rem 0 0;padding:0;display:grid}
+.raices-lista li{padding:1.2rem 0;border-top:1px solid var(--linea)}
+.raices-lista strong{display:block;font:600 1.12rem/1.25 var(--sora);margin-bottom:.35rem}
+.raices-lista span{color:var(--texto2);font-size:.98rem}
+
+/* Objetivos */
+.declaracion{font:500 clamp(1.4rem,4.6vw,2.2rem)/1.3 var(--sora);letter-spacing:-.015em;max-width:38ch;margin-top:1.25rem}
+.especificos{display:grid;gap:1.5rem;margin-top:2.5rem}
+.especificos > div{padding-top:1.25rem;border-top:1px solid var(--linea)}
+.especificos h3{font-size:1.1rem;font-weight:600;line-height:1.3;margin-bottom:.4rem}
+.especificos p{color:var(--texto2);font-size:.98rem}
+
+/* El sistema: galería */
+.sistema{background:var(--fondo);padding-bottom:5rem}
+.galeria{padding-top:4rem}
+.galeria-cab{margin-bottom:1.5rem}
+.galeria-cab p{color:var(--texto2);max-width:54ch;margin-top:.9rem;font-size:1.02rem}
+.pista{
+  display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:0 var(--gutter) .5rem;scroll-padding-inline:var(--gutter);
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.pista::-webkit-scrollbar{display:none}
+.panel{min-width:86vw;margin:0;scroll-snap-align:start}
+.panel img{
+  width:100%;aspect-ratio:16/9;object-fit:cover;
+  border:1px solid var(--linea2);border-radius:var(--r-superficie);background:var(--superficie);
+}
+.panel figcaption{margin-top:.75rem;color:var(--texto2);font-size:.95rem;line-height:1.4}
+.capacidades{padding-top:3rem}
+.capacidades h3{font-size:1.3rem;font-weight:600;margin-bottom:1.25rem}
+.lista-check{list-style:none;margin:0;padding:0;display:grid;gap:.8rem}
+.lista-check li{display:flex;gap:.7rem;align-items:flex-start;font-size:1rem}
+.lista-check i{color:var(--acento);font-size:1.25rem;line-height:1.45;flex:none}
+
+/* Software libre */
+.libre{border-top:1px solid var(--linea)}
+.stack{font:500 clamp(1.3rem,4.4vw,2.05rem)/1.35 var(--manrope);letter-spacing:-.012em;max-width:36ch;margin-top:1.25rem}
+
+/* Resultados */
+.gigante{display:block;font:600 clamp(4.5rem,20vw,8rem)/.95 var(--sora);letter-spacing:-.045em;font-variant-numeric:tabular-nums;margin-top:1.25rem}
+.frase{font:500 clamp(1.15rem,3.6vw,1.5rem)/1.35 var(--manrope);max-width:30ch;margin:.9rem 0 .6rem}
+.fichas{list-style:none;margin:2.5rem 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--linea)}
+.fichas li{padding:1.1rem 1rem 1.1rem 0;border-bottom:1px solid var(--linea)}
+.fichas .valor{display:block;font:500 clamp(1.5rem,6vw,2rem)/1 var(--mono);letter-spacing:-.02em;color:var(--texto);margin-bottom:.45rem;font-variant-numeric:tabular-nums}
+.fichas .item{color:var(--texto2);font-size:.88rem;line-height:1.4;display:block}
+.nota{margin-top:1.25rem}
+
+/* Metodología */
+.metodo{border-top:1px solid var(--linea)}
+.metodo .intro{color:var(--texto2);max-width:56ch;margin-top:1rem;font-size:1.02rem}
+.pasos{list-style:none;margin:2rem 0 0;padding:0 0 0 1.9rem;position:relative;display:grid;gap:1.4rem}
+.pasos::before{content:'';position:absolute;left:5px;top:.7rem;bottom:.7rem;width:1px;background:var(--linea2)}
+.pasos li{position:relative;font:600 1.1rem/1.35 var(--sora)}
+.pasos li::before{content:'';position:absolute;left:-1.9rem;top:.42rem;width:11px;height:11px;border-radius:50%;border:1px solid var(--texto2);background:var(--fondo)}
+
+/* Autores */
+.duo{display:grid;gap:2rem;margin-top:2rem}
+.autor{display:flex;gap:1rem;align-items:flex-start}
+.inicial{flex:none;width:56px;height:56px;border-radius:50%;border:1px solid var(--linea2);display:grid;place-items:center;font:600 1rem var(--sora);color:var(--acento);letter-spacing:.02em}
+.autor h3{font-size:1.2rem;font-weight:600;margin-bottom:.15rem}
+.autor p{color:var(--texto2);margin-bottom:.55rem}
+.autor a{display:inline-flex;align-items:center;gap:.4rem;font-weight:500}
+.tutor{margin-top:2.25rem;color:var(--texto2)}
+
+/* Tesis */
+.tesis{padding-block:1rem 3rem}
+.tesis-caja{background:var(--superficie);border:1px solid var(--linea);border-radius:var(--r-superficie);padding:2rem 1.4rem;display:grid;gap:2rem}
+.tesis-caja p{color:var(--texto2);max-width:46ch;margin-top:.9rem}
+.tesis-caja .acciones{margin-top:1.4rem;align-items:center}
+.tesis-caja .mono{width:100%}
+.qr{display:flex;flex-direction:column;align-items:flex-start;gap:.75rem}
+.qr-svg{width:160px;height:160px;background:#fff;padding:12px;border-radius:var(--r-superficie)}
+.qr-svg svg{display:block;width:100%;height:100%}
+.qr .mono{color:var(--texto2)}
+
+footer{padding:2rem 0 calc(6.5rem + env(safe-area-inset-bottom));color:var(--texto2);font-size:.92rem;border-top:1px solid var(--linea)}
+footer .in{display:flex;flex-direction:column;gap:.35rem}
+
+/* ---------- 768px ---------- */
+@media (min-width:768px){
+  body{font-size:17px}
+  .seccion{padding-block:6rem}
+  .nav-enlaces{display:flex;gap:1.9rem;margin-left:auto}
+  .nav-enlaces a{color:var(--texto2);text-decoration:none;font-weight:500;font-size:.95rem}
+  .nav-enlaces a:hover{color:var(--texto)}
+  .nav-cta{display:inline-flex;min-height:40px;padding-inline:1.1rem;font-size:.9rem}
+  .barra{display:none}
+  .hero{justify-content:center;padding:6rem 0 4rem}
+  .hero::before{display:none}
+  .hero h1{max-width:13ch}
+  .hero .lead{font-size:1.15rem;max-width:44ch}
+  .historia.js{min-height:300dvh}
+  .historia.js .escena{align-items:center;padding-bottom:0}
+  .historia.js .escena::before{display:none}
+  .escena h2{max-width:13ch}
+  .raices-lista{grid-template-columns:repeat(4,1fr)}
+  .raices-lista li{border-top:0;border-left:1px solid var(--linea);padding:.25rem 1.5rem}
+  .raices-lista li:first-child{border-left:0;padding-left:0}
+  .especificos{grid-template-columns:repeat(3,1fr);gap:3rem}
+  .especificos > div{border-top:0;padding-top:0}
+  .pista{gap:20px}
+  .panel{min-width:60vw}
+  .lista-check{grid-template-columns:1fr 1fr;gap:1rem 2.5rem}
+  .fichas{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border-top:0;gap:1.5rem 0}
+  .fichas li{border-bottom:0;border-left:1px solid var(--linea);padding:.2rem 1.1rem}
+  .fichas li:first-child{border-left:0;padding-left:0}
+  .fichas .valor{font-size:1.55rem}
+  .pasos{grid-template-columns:repeat(4,1fr);padding:1.9rem 0 0;gap:2rem}
+  .pasos::before{left:5px;right:5px;top:5px;bottom:auto;width:auto;height:1px}
+  .pasos li::before{left:0;top:-1.9rem}
+  .duo{grid-template-columns:1fr 1fr;gap:3rem}
+  .tesis-caja{grid-template-columns:1fr auto;align-items:center;padding:3rem}
+  .tesis-caja .mono{width:auto}
+  footer{padding-bottom:3rem}
+  footer .in{flex-direction:row;justify-content:space-between;gap:1.5rem}
+  .sin-webgl .hero{background-image:linear-gradient(to right, rgba(7,11,20,.92) 0%, rgba(7,11,20,.6) 55%, rgba(7,11,20,.35) 100%),url('/sistema/webp/g10_radar.webp')}
+}
+
+/* ---------- 1100px ---------- */
+@media (min-width:1100px){
+  .seccion{padding-block:7rem}
+  .hero h1{max-width:18ch}
+  .sistema{padding-bottom:6rem}
+  .galeria{height:100dvh;padding-top:var(--nav);display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+  .galeria-cab{margin-bottom:2rem}
+  .pista{padding-inline:max(var(--gutter),calc((100vw - 1180px) / 2));gap:24px}
+  .galeria.pan .pista{overflow:visible;scroll-snap-type:none;will-change:transform}
+  .panel{min-width:72vw}
+  .fichas .valor{font-size:1.7rem}
+}
+</style>
+</head>
+<body>
+
+<canvas id="enjambre" aria-hidden="true"></canvas>
+
+<header class="nav">
+  <div class="in nav-in">
+    <a class="marca" href="#top" aria-label="SIMCODVE, inicio">
+      <img src="/sistema/webp/unefa.webp" width="182" height="224" alt="Escudo de la UNEFA">
+      <span>SIMCODVE</span>
+    </a>
+    <nav class="nav-enlaces" aria-label="Secciones">
+      <a href="#problema">Problema</a>
+      <a href="#sistema">Sistema</a>
+      <a href="#resultados">Resultados</a>
+      <a href="#autores">Autores</a>
+    </nav>
+    <a class="boton primario nav-cta" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener">Ver tesis en PDF</a>
+  </div>
+</header>
+
+<main>
+
+  <section id="top" class="hero">
+    <div class="in">
+      <p class="mono meta">Trabajo Especial de Grado · UNEFA 2026</p>
+      <h1>Monitoreo y control de enjambres de drones para la defensa nacional</h1>
+      <p class="lead">SIMCODVE simula enjambres con control descentralizado y consenso sobre el mapa real de Venezuela. Todo con datos sintéticos.</p>
+      <div class="acciones">
+        <a class="boton primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener">Ver tesis en PDF</a>
+        <a class="boton fantasma" href="#sistema">Explorar el sistema</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="problema" class="historia" aria-label="El problema">
+    <div class="pegado">
+      <div class="escena"><div class="in">
+        <h2>Un operador, todo el enjambre.</h2>
+        <p>Cada dron decide con sus vecinos: sin líder, sin punto único de falla.</p>
+      </div></div>
+      <div class="escena"><div class="in">
+        <h2>Cambio de modo, misma red.</h2>
+        <p>Patrullaje, defensa o híbrido: el consenso reordena la formación en segundos.</p>
+      </div></div>
+      <div class="escena"><div class="in">
+        <h2>Cae el enlace, no la misión.</h2>
+        <p>Una zona de interferencia degrada nodos. El resto de la malla enruta y sigue operando.</p>
+      </div></div>
+      <div class="escena"><div class="in">
+        <h2>Se recupera y sigue.</h2>
+        <p>Conectividad, particiones y tiempo de recuperación se miden y se exportan.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="raices seccion">
+    <div class="in">
+      <h2>Cuatro raíces del problema</h2>
+      <p class="intro">El reto ya no es construir el dron sino el software que monitorea y controla muchas unidades a la vez y sigue operando ante fallas de enlace, pérdida de nodos o guerra electrónica. En Venezuela esa capacidad soberana aún no existe.</p>
+      <ul class="raices-lista">
+        <li><strong>Acceso restringido</strong><span>Restricciones comerciales y presupuestarias a plataformas avanzadas.</span></li>
+        <li><strong>Sin software soberano</strong><span>Falta desarrollo propio y auditable para arquitecturas distribuidas.</span></li>
+        <li><strong>Baja resiliencia</strong><span>Los sistemas convencionales fallan ante interferencia o caída de enlaces.</span></li>
+        <li><strong>Sin control descentralizado</strong><span>Sin consenso ni autonomía, la misión depende de un punto único.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="objetivos" class="seccion">
+    <div class="in">
+      <h2>Objetivos</h2>
+      <p class="declaracion">Diseñar conceptual y metodológicamente un sistema de monitoreo y control de drones para el contexto venezolano, enfocado en la defensa integral, la disuasión y la innovación híbrida.</p>
+      <div class="especificos">
+        <div>
+          <h3>Requerimientos operacionales</h3>
+          <p>Determinar las especificaciones críticas del sistema.</p>
+        </div>
+        <div>
+          <h3>Arquitectura SOA y gemelos digitales</h3>
+          <p>Diseñar una arquitectura orientada a servicios para simular y controlar enjambres en tiempo real.</p>
+        </div>
+        <div>
+          <h3>Control descentralizado y consenso</h3>
+          <p>Formular el modelo y los algoritmos que garantizan autonomía y resiliencia ante pérdida de nodos o interferencia.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sistema" class="sistema">
+    <div class="galeria">
+      <div class="in galeria-cab">
+        <h2>El sistema</h2>
+        <p>Un prototipo académico que simula enjambres de drones sobre el mapa satelital real de Venezuela: control descentralizado, red mesh, inyección de fallos y métricas de resiliencia.</p>
+      </div>
+      <div class="pista">
+        <figure class="panel">
+          <picture>
+            <source media="(max-width:767px)" srcset="/sistema/webp/g04_mapa_enjambres-m.webp">
+            <img src="/sistema/webp/g04_mapa_enjambres.webp" width="1680" height="945" loading="lazy" alt="Mapa satelital de Los Teques con tres enjambres de drones y sus zonas asignadas">
+          </picture>
+          <figcaption>Mapa táctico: enjambres sobre imágenes satelitales reales</figcaption>
+        </figure>
+        <figure class="panel">
+          <picture>
+            <source media="(max-width:767px)" srcset="/sistema/webp/g10_radar-m.webp">
+            <img src="/sistema/webp/g10_radar.webp" width="1680" height="945" loading="lazy" alt="Vista de radar con anillos de distancia y barrido en vivo">
+          </picture>
+          <figcaption>Vista de radar con anillos de distancia y barrido en vivo</figcaption>
+        </figure>
+        <figure class="panel">
+          <picture>
+            <source media="(max-width:767px)" srcset="/sistema/webp/g09_modo_defensa-m.webp">
+            <img src="/sistema/webp/g09_modo_defensa.webp" width="1680" height="945" loading="lazy" alt="Enjambre en modo defensa formando un anillo estático alrededor del objetivo">
+          </picture>
+          <figcaption>Modo defensa: perímetro estático alrededor del objetivo</figcaption>
+        </figure>
+        <figure class="panel">
+          <picture>
+            <source media="(max-width:767px)" srcset="/sistema/webp/g11_interferencia-m.webp">
+            <img src="/sistema/webp/g11_interferencia.webp" width="1680" height="945" loading="lazy" alt="Zona roja de interferencia sobre el mapa degradando los nodos del enjambre">
+          </picture>
+          <figcaption>Interferencia: una zona de guerra electrónica degrada los nodos</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="in capacidades">
+      <h3>Ocho capacidades del prototipo</h3>
+      <ul class="lista-check">
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Despliegue de enjambres sobre mapa satelital real</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Telemetría y gemelo digital de cada unidad: posición, velocidad, altitud, batería</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Modos patrullaje, defensa e híbrido</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Inyección de fallos y jamming</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Batería y retorno a base</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Alertas clasificadas</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Métricas e historial exportables: conectividad, cobertura, coherencia, recuperación</span></li>
+        <li><i class="ph ph-check" aria-hidden="true"></i><span>Pausa, reanudar, reiniciar y escenarios reproducibles con semilla</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="libre seccion">
+    <div class="in">
+      <h2>Software libre</h2>
+      <p class="stack">React, Vite y Leaflet con imágenes Esri en la interfaz. Python y FastAPI con WebSocket de telemetría en el servidor. Docker para desplegar.</p>
+    </div>
+  </section>
+
+  <section id="resultados" class="seccion">
+    <div class="in">
+      <h2>Resultados</h2>
+      <span class="gigante num" data-valor="100" data-dec="0">100&nbsp;%</span>
+      <p class="frase">de aceptación en necesidad, formación y soberanía tecnológica</p>
+      <p class="mono">12 especialistas de la UNEFA, escala Likert</p>
+      <ul class="fichas">
+        <li><span class="valor num" data-valor="100" data-dec="0">100&nbsp;%</span><span class="item">Necesidad del prototipo académico</span></li>
+        <li><span class="valor num" data-valor="100" data-dec="0">100&nbsp;%</span><span class="item">Contribución a la formación tecnológica</span></li>
+        <li><span class="valor num" data-valor="100" data-dec="0">100&nbsp;%</span><span class="item">Aporte a la soberanía tecnológica</span></li>
+        <li><span class="valor num" data-valor="100" data-dec="0">100&nbsp;%</span><span class="item">Utilidad de la interfaz tipo radar</span></li>
+        <li><span class="valor num" data-valor="100" data-dec="0">100&nbsp;%</span><span class="item">Ventajas de la arquitectura modular</span></li>
+        <li><span class="valor num" data-valor="91.67" data-dec="2">91,67&nbsp;%</span><span class="item">Relación con la defensa integral</span></li>
+        <li><span class="valor num" data-valor="91.67" data-dec="2">91,67&nbsp;%</span><span class="item">Adecuación de los datos sintéticos</span></li>
+      </ul>
+      <p class="mono nota">8 de 12 ítems con aprobación unánime</p>
+    </div>
+  </section>
+
+  <section class="metodo seccion">
+    <div class="in">
+      <h2>Metodología</h2>
+      <p class="intro">Proyecto factible, de enfoque cuantitativo, aplicado y tecnológico-proyectivo, con Desarrollo Rápido de Aplicaciones (RAD) en cuatro fases.</p>
+      <ol class="pasos">
+        <li>Requerimientos</li>
+        <li>Diseño con el usuario</li>
+        <li>Construcción rápida</li>
+        <li>Transición y validación</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="autores" class="seccion">
+    <div class="in">
+      <h2>Autores</h2>
+      <div class="duo">
+        <div class="autor">
+          <div class="inicial" aria-hidden="true">DR</div>
+          <div>
+            <h3>Diego Rodríguez</h3>
+            <p>Aspirante a Ingeniero de Sistemas</p>
+            <a href="https://github.com/D13G0ARJ" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>github.com/D13G0ARJ</a>
+          </div>
+        </div>
+        <div class="autor">
+          <div class="inicial" aria-hidden="true">YA</div>
+          <div>
+            <h3>Yoneiker Azocar</h3>
+            <p>Aspirante a Ingeniero de Sistemas</p>
+            <a href="https://github.com/AlexanderAzocar" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>github.com/AlexanderAzocar</a>
+          </div>
+        </div>
+      </div>
+      <p class="tutor">Tutor: Rodolfo Caccamo. UNEFA, Núcleo Altos Mirandinos.</p>
+    </div>
+  </section>
+
+  <section id="tesis" class="tesis">
+    <div class="in">
+      <div class="tesis-caja">
+        <div>
+          <h2>Lee la tesis completa</h2>
+          <p>139 páginas del Trabajo Especial de Grado «Diseño de un Sistema de Monitoreo y Control de Drones en el Contexto Venezolano: Un Enfoque Tecnológico para la Defensa, Disuasión e Innovación Híbrida».</p>
+          <div class="acciones">
+            <a class="boton primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener"><i class="ph ph-file-pdf" aria-hidden="true"></i>Ver tesis en PDF</a>
+            <span class="mono">PDF de 19,5 MB · 139 páginas</span>
+            <a class="boton fantasma" href="https://github.com/D13G0ARJ/SIMCODVE-sistema-de-monitoreo-y-control-de-drones-en-el-contexto-venezolano" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>Repositorio en GitHub</a>
+          </div>
+        </div>
+        <div class="qr">
+          <div class="qr-svg" id="qr" role="img" aria-label="Código QR con la dirección de esta página"></div>
+          <span class="mono">Escanea para abrir esta página</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="in">
+    <span>© 2026 Diego Rodríguez y Yoneiker Azocar · UNEFA</span>
+    <span>Prototipo académico con datos 100 % sintéticos</span>
+  </div>
+</footer>
+
+<div class="barra">
+  <a class="boton primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener">Ver tesis en PDF</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var URL_PUBLICA = 'https://simcodve.vercel.app';
+
+  /* Estado compartido con el enjambre (módulo Three.js). fase es continua:
+     0 disperso, 1 patrullaje, 2 defensa, 3 interferencia, 4 recuperación. */
+  window.estado = { fase: 0, jam: 0, opacidad: 1 };
+
+  /* QR */
+  try {
+    var q = qrcode(0, 'M');
+    q.addData(URL_PUBLICA);
+    q.make();
+    document.getElementById('qr').innerHTML = q.createSvgTag({ scalable: true, margin: 0 });
+  } catch (e) { /* sin QR, el enlace sigue disponible */ }
+
+  /* Si el módulo del enjambre no arranca (sin CDN, sin módulos), fondo de respaldo. */
+  setTimeout(function () {
+    if (!window.__enjambreListo) document.documentElement.classList.add('sin-webgl');
+  }, 4000);
+
+  if (!window.gsap || !window.ScrollTrigger) return;
+  gsap.registerPlugin(ScrollTrigger);
+  var estado = window.estado;
+
+  /* Navegación y barra inferior: solo clases, sin tweens. */
+  ScrollTrigger.create({ trigger: document.body, start: 24, end: 'max', toggleClass: { targets: '.nav', className: 'solida' } });
+  ScrollTrigger.create({ trigger: document.body, start: function () { return window.innerHeight * 0.8; }, end: 'max', toggleClass: { targets: '.barra', className: 'ver' } });
+
+  function formatear(v, dec) { return v.toFixed(dec).replace('.', ',') + ' %'; }
+
+  function partirLineas(el) {
+    var texto = el.textContent.trim();
+    var palabras = texto.split(/\s+/);
+    el.innerHTML = palabras.map(function (p) { return '<span class="w">' + p + '</span>'; }).join(' ');
+    var lineas = [], top = null;
+    Array.prototype.forEach.call(el.querySelectorAll('.w'), function (w) {
+      if (w.offsetTop !== top) { top = w.offsetTop; lineas.push([]); }
+      lineas[lineas.length - 1].push(w.textContent);
+    });
+    el.innerHTML = lineas.map(function (l) {
+      return '<span class="lin"><span class="lin-in">' + l.join(' ') + '</span></span>';
+    }).join('');
+  }
+
+  var mm = gsap.matchMedia();
+
+  mm.add('(prefers-reduced-motion: no-preference)', function () {
+
+    /* Carga del hero: líneas del título con máscara, luego párrafo y botones. */
+    var h1 = document.querySelector('.hero h1');
+    var original = h1.innerHTML;
+    var fuentes = document.fonts ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1200); })]) : Promise.resolve();
+    fuentes.then(function () {
+      partirLineas(h1);
+      var tl = gsap.timeline({ defaults: { ease: 'power3.out' }, onComplete: function () { h1.innerHTML = original; } });
+      tl.from('.hero .meta', { autoAlpha: 0, duration: .6 }, 0)
+        .from(h1.querySelectorAll('.lin-in'), { yPercent: 100, duration: .9, stagger: .08 }, .1)
+        .from(['.hero .lead', '.hero .acciones'], { autoAlpha: 0, y: 12, duration: .7, stagger: .12 }, .6);
+    });
+
+    /* Hero: de disperso a patrullaje mientras sale de pantalla. */
+    gsap.fromTo(estado, { fase: 0 }, {
+      fase: 1, ease: 'none', immediateRender: false,
+      scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.8 }
+    });
+
+    /* Momento de autor: la historia del enjambre. */
+    var historia = document.querySelector('.historia');
+    historia.classList.add('js');
+    var escenas = gsap.utils.toArray('.escena');
+    gsap.set(escenas.slice(1), { autoAlpha: 0, y: 24 });
+    var tl = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: { trigger: historia, start: 'top top', end: 'bottom bottom', scrub: 0.8 }
+    });
+    tl.to(escenas[0], { autoAlpha: 0, y: -24, duration: .6 }, 1.8)
+      .fromTo(estado, { fase: 1 }, { fase: 2, duration: 1.4, immediateRender: false }, 2.0)
+      .to(escenas[1], { autoAlpha: 1, y: 0, duration: .6 }, 2.4)
+      .to(escenas[1], { autoAlpha: 0, y: -24, duration: .6 }, 4.3)
+      .fromTo(estado, { fase: 2, jam: 0 }, { fase: 3, jam: 1, duration: 1.2, immediateRender: false }, 4.6)
+      .to(escenas[2], { autoAlpha: 1, y: 0, duration: .6 }, 4.9)
+      .to(escenas[2], { autoAlpha: 0, y: -24, duration: .6 }, 6.8)
+      .fromTo(estado, { fase: 3, jam: 1 }, { fase: 4, jam: 0, duration: 1.2, immediateRender: false }, 7.1)
+      .to(escenas[3], { autoAlpha: 1, y: 0, duration: .6 }, 7.4)
+      .to(escenas[3], { autoAlpha: 0, y: -24, duration: .5 }, 9.5)
+      .to({}, { duration: .01 }, 10);
+
+    /* Continuidad: el resto de la página en patrullaje atenuado; la tesis vuelve a disperso. */
+    gsap.fromTo(estado, { fase: 4, opacidad: 1 }, {
+      fase: 1, opacidad: .38, ease: 'none', immediateRender: false,
+      scrollTrigger: { trigger: '.raices', start: 'top bottom', end: 'top 25%', scrub: 0.8 }
+    });
+    gsap.fromTo(estado, { fase: 1, opacidad: .38 }, {
+      fase: 0, opacidad: 1, ease: 'none', immediateRender: false,
+      scrollTrigger: { trigger: '#tesis', start: 'top bottom', end: 'top 35%', scrub: 0.8 }
+    });
+
+    /* Contadores de resultados, una sola vez. */
+    gsap.utils.toArray('.num').forEach(function (el) {
+      var valor = parseFloat(el.getAttribute('data-valor'));
+      var dec = parseInt(el.getAttribute('data-dec'), 10) || 0;
+      var o = { v: 0 };
+      gsap.to(o, {
+        v: valor, duration: 1.6, ease: 'power2.out',
+        onUpdate: function () { el.textContent = formatear(o.v, dec); },
+        scrollTrigger: { trigger: el, start: 'top 88%', once: true }
+      });
+    });
+
+    return function () { historia.classList.remove('js'); };
+  });
+
+  /* Galería horizontal pineada solo en escritorio. En móvil es un carrusel nativo con snap. */
+  mm.add('(min-width: 1100px) and (prefers-reduced-motion: no-preference)', function () {
+    var galeria = document.querySelector('.galeria');
+    var pista = galeria.querySelector('.pista');
+    galeria.classList.add('pan');
+    gsap.to(pista, {
+      x: function () { return -(pista.scrollWidth - window.innerWidth); },
+      ease: 'none',
+      scrollTrigger: {
+        trigger: galeria,
+        start: 'top top',
+        end: function () { return '+=' + (pista.scrollWidth - window.innerWidth); },
+        pin: true,
+        scrub: 1,
+        invalidateOnRefresh: true
+      }
+    });
+    return function () { galeria.classList.remove('pan'); };
+  });
+
+  window.addEventListener('load', function () { ScrollTrigger.refresh(); });
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const estado = window.estado || { fase: 0, jam: 0, opacidad: 1 };
+const lienzo = document.getElementById('enjambre');
+const esMovil = matchMedia('(max-width: 768px)').matches;
+const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let renderer = null;
+try {
+  if (!window.WebGLRenderingContext) throw new Error('Sin WebGL');
+  renderer = new THREE.WebGLRenderer({
+    canvas: lienzo, alpha: true, antialias: !esMovil, powerPreference: 'high-performance'
+  });
+} catch (e) { renderer = null; }
+
+if (!renderer) {
+  document.documentElement.classList.add('sin-webgl');
+} else {
+  window.__enjambreListo = true;
+  iniciar();
+}
+
+function iniciar() {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setClearColor(0x000000, 0);
+
+  const escena = new THREE.Scene();
+  const camara = new THREE.PerspectiveCamera(50, 1, 0.1, 40);
+  camara.position.z = 6;
+  const grupo = new THREE.Group();
+  escena.add(grupo);
+
+  const N = esMovil ? 42 : 80;
+  const R = esMovil ? 0.95 : 1.7;
+  const ENLACE2 = Math.pow(R * 0.34, 2);
+  const CIAN = new THREE.Color('#22D3EE');
+  const ROJO = new THREE.Color('#F43F5E');
+  const DOS_PI = Math.PI * 2;
+
+  /* Generador determinista: la misma formación en cada visita. */
+  let semilla = 20260621;
+  const azar = () => {
+    semilla |= 0; semilla = semilla + 0x6D2B79F5 | 0;
+    let t = Math.imul(semilla ^ semilla >>> 15, 1 | semilla);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+
+  /* Objetivos por fase, calculados una sola vez. */
+  const caja = new Float32Array(N * 3);
+  const defensa = new Float32Array(N * 3);
+  const ang = new Float32Array(N);
+  const alt = new Float32Array(N);
+  const brillo = new Float32Array(N);
+  const umbral = new Float32Array(N);
+  const esJam = new Uint8Array(N);
+  const caido = new Uint8Array(N);
+  const pos = new Float32Array(N * 3);
+
+  let nInt = 0;
+  for (let i = 0; i < N; i++) if (i % 3 === 2) nInt++;
+  const nExt = N - nInt;
+  let iE = 0, iI = 0;
+  for (let i = 0; i < N; i++) {
+    const i3 = i * 3;
+    ang[i] = (i / N) * DOS_PI + (azar() - .5) * .05;
+    alt[i] = (azar() - .5) * .18;
+    brillo[i] = .68 + azar() * .32;
+    caja[i3] = (azar() - .5) * R * 3.2;
+    caja[i3 + 1] = (azar() - .5) * R * 1.6;
+    caja[i3 + 2] = (azar() - .5) * R * 2.2;
+    const interno = i % 3 === 2;
+    let a, r, y;
+    if (interno) { a = (iI++ / nInt) * DOS_PI + .2; r = R * .36; y = alt[i] + .16; }
+    else { a = (iE++ / nExt) * DOS_PI; r = R * .72; y = alt[i]; }
+    defensa[i3] = Math.cos(a) * r;
+    defensa[i3 + 1] = y;
+    defensa[i3 + 2] = Math.sin(a) * r;
+    /* Zona de interferencia: un cuadrante del anillo (25 % de los nodos). */
+    const an = ((a % DOS_PI) + DOS_PI) % DOS_PI;
+    esJam[i] = (an >= .35 && an < .35 + Math.PI / 2) ? 1 : 0;
+    umbral[i] = .3 + azar() * .45;
+  }
+
+  /* Sprite radial suave para los nodos. */
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const g = cv.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(.3, 'rgba(255,255,255,.95)');
+  gr.addColorStop(.6, 'rgba(255,255,255,.35)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  const sprite = new THREE.CanvasTexture(cv);
+
+  const geoP = new THREE.BufferGeometry();
+  const posAttr = new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage);
+  const colAttr = new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage);
+  geoP.setAttribute('position', posAttr);
+  geoP.setAttribute('color', colAttr);
+  const matP = new THREE.PointsMaterial({
+    size: esMovil ? .13 : .15, map: sprite, vertexColors: true,
+    transparent: true, depthWrite: false, sizeAttenuation: true
+  });
+  const puntos = new THREE.Points(geoP, matP);
+  puntos.frustumCulled = false;
+  grupo.add(puntos);
+
+  const maxPares = N * (N - 1) / 2;
+  const geoL = new THREE.BufferGeometry();
+  const linAttr = new THREE.BufferAttribute(new Float32Array(maxPares * 6), 3).setUsage(THREE.DynamicDrawUsage);
+  geoL.setAttribute('position', linAttr);
+  geoL.setDrawRange(0, 0);
+  const matL = new THREE.LineBasicMaterial({ color: CIAN, transparent: true, opacity: .22, depthWrite: false });
+  const enlaces = new THREE.LineSegments(geoL, matL);
+  enlaces.frustumCulled = false;
+  grupo.add(enlaces);
+
+  const tmp = new THREE.Color();
+  const obj = [0, 0, 0];
+  const objB = [0, 0, 0];
+  const puntero = { x: 0, y: 0, ox: 0, oy: 0 };
+  let rot = 0, giro = 0, rafId = 0, anterior = 0;
+
+  function objetivo(fase, i, out) {
+    const i3 = i * 3;
+    if (fase <= 0) { out[0] = caja[i3]; out[1] = caja[i3 + 1]; out[2] = caja[i3 + 2]; }
+    else if (fase === 1) { const a = ang[i] + rot; out[0] = Math.cos(a) * R; out[1] = alt[i]; out[2] = Math.sin(a) * R; }
+    else { out[0] = defensa[i3]; out[1] = defensa[i3 + 1]; out[2] = defensa[i3 + 2]; }
+  }
+
+  const suave = (x) => { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); };
+
+  function actualizar(dt, t, k) {
+    rot += dt * .00035;
+    giro += dt * .00004;
+    const f = Math.max(0, Math.min(4, estado.fase));
+    const fa = Math.floor(f), ft = f - fa;
+    const jam = estado.jam;
+    const pa = posAttr.array, ca = colAttr.array, la = linAttr.array;
+
+    for (let i = 0; i < N; i++) {
+      const i3 = i * 3;
+      objetivo(fa, i, obj);
+      if (ft > 0) {
+        objetivo(fa + 1, i, objB);
+        obj[0] += (objB[0] - obj[0]) * ft;
+        obj[1] += (objB[1] - obj[1]) * ft;
+        obj[2] += (objB[2] - obj[2]) * ft;
+      }
+      pos[i3] += (obj[0] - pos[i3]) * k;
+      pos[i3 + 1] += (obj[1] - pos[i3 + 1]) * k;
+      pos[i3 + 2] += (obj[2] - pos[i3 + 2]) * k;
+
+      let kj = 0;
+      if (esJam[i]) kj = suave((jam - umbral[i] + .15) / .3);
+      caido[i] = kj > .5 ? 1 : 0;
+      const tr = kj * .045;
+
+      pa[i3] = pos[i3] + Math.sin(t * .9 + i * 1.7) * .02 + (tr ? Math.sin(t * 37 + i) * tr : 0);
+      pa[i3 + 1] = pos[i3 + 1] + Math.cos(t * .7 + i * 2.3) * .02 + (tr ? Math.cos(t * 41 + i * 1.3) * tr : 0);
+      pa[i3 + 2] = pos[i3 + 2] + Math.sin(t * .8 + i * 3.1) * .02 + (tr ? Math.sin(t * 29 + i * .7) * tr : 0);
+
+      tmp.copy(CIAN).multiplyScalar(brillo[i]);
+      if (kj > 0) tmp.lerp(ROJO, kj);
+      ca[i3] = tmp.r; ca[i3 + 1] = tmp.g; ca[i3 + 2] = tmp.b;
+    }
+
+    /* Enlaces mesh por distancia; los nodos degradados pierden sus enlaces. */
+    let n = 0;
+    for (let i = 0; i < N; i++) {
+      if (caido[i]) continue;
+      const ix = pa[i * 3], iy = pa[i * 3 + 1], iz = pa[i * 3 + 2];
+      for (let j = i + 1; j < N; j++) {
+        if (caido[j]) continue;
+        const dx = ix - pa[j * 3], dy = iy - pa[j * 3 + 1], dz = iz - pa[j * 3 + 2];
+        if (dx * dx + dy * dy + dz * dz < ENLACE2) {
+          la[n++] = ix; la[n++] = iy; la[n++] = iz;
+          la[n++] = pa[j * 3]; la[n++] = pa[j * 3 + 1]; la[n++] = pa[j * 3 + 2];
+        }
+      }
+    }
+    geoL.setDrawRange(0, n / 3);
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+    if (linAttr.clearUpdateRanges) { linAttr.clearUpdateRanges(); linAttr.addUpdateRange(0, n); }
+    linAttr.needsUpdate = true;
+
+    puntero.x += (puntero.ox - puntero.x) * .05;
+    puntero.y += (puntero.oy - puntero.y) * .05;
+    grupo.rotation.y = giro + puntero.x * .15;
+    grupo.rotation.x = .75 + puntero.y * .1;
+    matP.opacity = estado.opacidad;
+    matL.opacity = .22 * estado.opacidad;
+  }
+
+  function cuadro(ahora) {
+    rafId = requestAnimationFrame(cuadro);
+    const dt = Math.min(48, ahora - anterior);
+    anterior = ahora;
+    actualizar(dt, ahora * .001, 1 - Math.pow(.96, dt / 16.7));
+    renderer.render(escena, camara);
+  }
+  function arrancar() {
+    if (rafId || reducido) return;
+    anterior = performance.now();
+    rafId = requestAnimationFrame(cuadro);
+  }
+  function parar() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+
+  function tamano() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camara.aspect = w / h;
+    camara.updateProjectionMatrix();
+    /* Móvil: el grupo vive en el tercio superior; escritorio: a la derecha del texto. */
+    if (w < 768) grupo.position.set(0, 1.05, 0);
+    else grupo.position.set(Math.min(1.9, (w / h - 1) * 2.4), 0, 0);
+    if (reducido) renderer.render(escena, camara);
+  }
+  window.addEventListener('resize', tamano);
+  tamano();
+
+  if (!esMovil) {
+    window.addEventListener('pointermove', (e) => {
+      puntero.ox = (e.clientX / window.innerWidth - .5) * 2;
+      puntero.oy = (e.clientY / window.innerHeight - .5) * 2;
+    }, { passive: true });
+  }
+
+  if (reducido) {
+    /* Movimiento reducido: una formación estática en anillo, sin bucle. */
+    estado.fase = 1;
+    for (let i = 0; i < N; i++) { objetivo(1, i, obj); pos[i * 3] = obj[0]; pos[i * 3 + 1] = obj[1]; pos[i * 3 + 2] = obj[2]; }
+    actualizar(0, 0, 1);
+    matP.opacity = .5; matL.opacity = .11;
+    renderer.render(escena, camara);
+    return;
+  }
+
+  /* Posición inicial: dispersa (fase 0). */
+  for (let i = 0; i < N; i++) { objetivo(0, i, obj); pos[i * 3] = obj[0]; pos[i * 3 + 1] = obj[1]; pos[i * 3 + 2] = obj[2]; }
+
+  if (window.gsap) {
+    grupo.scale.setScalar(.6);
+    window.gsap.to(grupo.scale, { x: 1, y: 1, z: 1, duration: 1.2, ease: 'expo.out' });
+  }
+
+  document.addEventListener('visibilitychange', () => { document.hidden ? parar() : arrancar(); });
+  arrancar();
+}
+</script>
+</body>
+</html>

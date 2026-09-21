@@ -1,29 +1,37 @@
-import Nav from './components/Nav'
+import { useEffect, useRef } from 'react'
+import Enjambre from './components/Enjambre'
+import Nav, { BarraInferior } from './components/Nav'
 import Hero from './components/Hero'
-import Marquee from './components/Marquee'
-import { Stats, Problema, Objetivos, Conceptos } from './components/Secciones'
+import Historia from './components/Historia'
+import { Raices, Objetivos, Libre, Metodologia, Autores } from './components/Secciones'
 import Sistema from './components/Sistema'
-import { Stack, Resultados, Metodologia, Autores, Descarga, Footer } from './components/Cierre'
+import Resultados from './components/Resultados'
+import Tesis, { Footer } from './components/Tesis'
+import { iniciarAnimaciones } from './animaciones'
 
 export default function App() {
+  const raiz = useRef(null)
+
+  useEffect(() => iniciarAnimaciones(raiz.current), [])
+
   return (
-    <>
+    <div ref={raiz}>
+      <Enjambre />
       <Nav />
       <main>
         <Hero />
-        <Stats />
-        <Problema />
+        <Historia />
+        <Raices />
         <Objetivos />
-        <Conceptos />
-        <Marquee />
         <Sistema />
-        <Stack />
+        <Libre />
         <Resultados />
         <Metodologia />
         <Autores />
-        <Descarga />
+        <Tesis />
       </main>
       <Footer />
-    </>
+      <BarraInferior />
+    </div>
   )
 }

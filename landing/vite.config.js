@@ -6,12 +6,12 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
-    chunkSizeWarningLimit: 1200,
+    target: 'es2020',
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
-          motion: ['framer-motion'],
+          react: ['react', 'react-dom'],
+          gsap: ['gsap', 'gsap/ScrollTrigger'],
         },
       },
     },

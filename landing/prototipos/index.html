@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipos SIMCODVE</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 15px/1.5 system-ui, sans-serif; background: #111418; color: #e7ecf2; padding: 24px 20px 48px; }
+  h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 4px; }
+  p.sub { color: #98a4b3; margin-bottom: 20px; }
+  .modo { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .modo button { background: #1c2129; color: #e7ecf2; border: 1px solid #2b323c; padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .modo button[aria-pressed="true"] { background: #e7ecf2; color: #111418; border-color: #e7ecf2; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+  .card { background: #171b21; border: 1px solid #2b323c; border-radius: 14px; padding: 14px; }
+  .card header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .card h2 { font-size: 1rem; font-weight: 600; }
+  .card a { color: #8fd3ff; text-decoration: none; font-size: .9rem; }
+  .card a:hover { text-decoration: underline; }
+  .card small { color: #98a4b3; display: block; margin-bottom: 10px; }
+  .tel { width: 390px; max-width: 100%; height: 780px; border: 10px solid #0a0c0f; border-radius: 34px; overflow: hidden; background: #000; margin: 0 auto; box-shadow: 0 30px 60px -30px rgba(0,0,0,.9); }
+  .tel iframe { width: 100%; height: 100%; border: 0; display: block; }
+  body[data-modo="desk"] .grid { grid-template-columns: 1fr; }
+  body[data-modo="desk"] .tel { width: 100%; height: 820px; border-radius: 12px; border-width: 4px; }
+</style>
+</head>
+<body data-modo="movil">
+  <h1>Prototipos de la landing SIMCODVE</h1>
+  <p class="sub">Tres direcciones visuales. Abre cada una a pantalla completa para probar el scroll en tu propio celular (misma red: <code>npm run dev -- --host</code>).</p>
+  <div class="modo" role="group" aria-label="Vista">
+    <button type="button" data-set="movil" aria-pressed="true">Vista celular (390 px)</button>
+    <button type="button" data-set="desk" aria-pressed="false">Vista escritorio</button>
+  </div>
+  <div class="grid">
+    <article class="card">
+      <header><h2>A · Sala de mando</h2><a href="/prototipos/a.html" target="_blank" rel="noopener">Abrir ↗</a></header>
+      <small>Capturas reales como protagonistas, barrido de radar al cargar, diagrama del problema scrubeado, sticky stack del sistema.</small>
+      <div class="tel"><iframe src="/prototipos/a.html" title="Prototipo A" loading="lazy"></iframe></div>
+    </article>
+    <article class="card">
+      <header><h2>B · Dossier técnico</h2><a href="/prototipos/b.html" target="_blank" rel="noopener">Abrir ↗</a></header>
+      <small>Tema claro editorial, capítulos con riel de progreso, capturas como figuras con leyenda, tablas tipográficas.</small>
+      <div class="tel"><iframe src="/prototipos/b.html" title="Prototipo B" loading="lazy"></iframe></div>
+    </article>
+    <article class="card">
+      <header><h2>C · Enjambre vivo</h2><a href="/prototipos/c.html" target="_blank" rel="noopener">Abrir ↗</a></header>
+      <small>Enjambre Three.js de fondo que cambia de formación con el scroll: patrullaje, defensa, interferencia, recuperación.</small>
+      <div class="tel"><iframe src="/prototipos/c.html" title="Prototipo C" loading="lazy"></iframe></div>
+    </article>
+  </div>
+  <script>
+    document.querySelectorAll('.modo button').forEach(b => b.addEventListener('click', () => {
+      document.body.dataset.modo = b.dataset.set
+      document.querySelectorAll('.modo button').forEach(x => x.setAttribute('aria-pressed', x === b))
+    }))
+  </script>
+</body>
+</html>

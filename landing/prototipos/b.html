@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIMCODVE</title>
+<meta name="description" content="Diseño de un Sistema de Monitoreo y Control de Drones en el Contexto Venezolano. Trabajo especial de grado, UNEFA, 2026.">
+<meta name="theme-color" content="#F5F6F8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+/* ============================================================
+   PROTOTIPO B · "Dossier técnico"
+   Sistema de radios: TODO RECTO (0px). Botones, figuras, QR y
+   tablas sin esquinas redondeadas, como un informe impreso.
+   Un solo acento: cobalto #2454FF. Sin sombras de color.
+   ============================================================ */
+:root{
+  --papel:#F5F6F8;
+  --superficie:#FFFFFF;
+  --tinta:#0B1730;
+  --texto2:#4A5568;
+  --linea:#D6DAE1;
+  --cobalto:#2454FF;
+  --tinta-20:rgba(11,23,48,.2);
+  --tinta-35:rgba(11,23,48,.35);
+  --papel-20:rgba(245,246,248,.22);
+  --gutter:20px;
+  --barra:56px;
+  --riel:0px;
+  --display:"Bricolage Grotesque", "Instrument Sans", system-ui, sans-serif;
+  --cuerpo:"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  scrollbar-color: var(--tinta-35) var(--papel);
+}
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+body{
+  margin:0; background:var(--papel); color:var(--tinta);
+  font-family:var(--cuerpo); font-size:1.0625rem; line-height:1.55;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden; padding-left:var(--riel);
+}
+::selection{ background:var(--cobalto); color:#fff; }
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background:var(--papel); }
+::-webkit-scrollbar-thumb{ background:var(--tinta-35); border:2px solid var(--papel); }
+a{ color:var(--cobalto); text-decoration-thickness:1px; text-underline-offset:.2em; }
+a:focus-visible, button:focus-visible{ outline:2px solid var(--cobalto); outline-offset:3px; }
+img{ display:block; max-width:100%; height:auto; }
+h1,h2,h3{ font-family:var(--display); font-optical-sizing:auto; text-wrap:balance; margin:0; }
+p{ margin:0; }
+.mono{ font-family:var(--mono); font-weight:400; font-size:.78rem; letter-spacing:0; }
+
+/* ---------- Estructura común ---------- */
+.contenido{ width:100%; max-width:1180px; margin-inline:auto; padding-inline:var(--gutter); }
+.capitulo{ padding-block:64px; }
+.capitulo + .capitulo .contenido{ border-top:1px solid var(--linea); padding-top:56px; }
+.capitulo h2{
+  font-weight:600; font-size:clamp(1.85rem, 6.4vw, 2.6rem); line-height:1.05;
+  letter-spacing:-0.025em; margin-bottom:36px;
+}
+.capitulo h2 .num{ font-family:var(--mono); font-weight:500; font-size:.55em; letter-spacing:0; color:var(--texto2); margin-right:.5em; position:relative; top:-.12em; }
+.medida{ max-width:62ch; }
+.texto2{ color:var(--texto2); }
+
+/* ---------- Botones ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
+  min-height:48px; padding:0 1.25rem; font-family:var(--cuerpo); font-weight:600; font-size:.95rem; line-height:1;
+  color:var(--tinta); background:transparent; border:1px solid var(--tinta); text-decoration:none;
+  cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent;
+  transition:background-color .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+}
+.btn:hover{ background:var(--tinta); color:var(--papel); }
+.btn:active{ transform:scale(.98); }
+.btn:focus-visible{ outline:2px solid var(--cobalto); outline-offset:3px; }
+.btn .ph{ font-size:1.15em; }
+.btn-primario{ background:var(--cobalto); border-color:var(--cobalto); color:#fff; }
+.btn-primario:hover{ background:var(--tinta); border-color:var(--tinta); color:#fff; }
+.btn-papel{ color:var(--papel); border-color:var(--papel); }
+.btn-papel:hover{ background:var(--papel); color:var(--tinta); }
+.btn-sm{ min-height:40px; padding:0 1rem; font-size:.875rem; }
+
+/* ---------- Barra superior (móvil y escritorio) ---------- */
+.barra{
+  position:fixed; inset:0 0 auto var(--riel); z-index:40; height:var(--barra);
+  background:var(--papel); border-bottom:1px solid var(--linea);
+  display:flex; align-items:center; justify-content:space-between;
+  padding-inline:var(--gutter);
+}
+.barra .marca{ font-family:var(--display); font-weight:700; font-size:1.05rem; letter-spacing:-0.03em; color:var(--tinta); text-decoration:none; }
+.barra .cap-actual{ font-family:var(--mono); font-size:.78rem; color:var(--tinta); white-space:nowrap; }
+.barra .nav, .barra .btn{ display:none; }
+.barra .progreso{
+  position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--cobalto);
+  transform:scaleX(0); transform-origin:left center; will-change:transform;
+}
+
+/* ---------- Riel de capítulos (solo escritorio) ---------- */
+.riel{ display:none; }
+
+/* ---------- Barra inferior móvil ---------- */
+.barra-inf{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  background:var(--papel); border-top:1px solid var(--linea);
+  padding:10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  display:flex; align-items:center; gap:12px;
+  transform:translateY(110%); will-change:transform;
+}
+@media (prefers-reduced-motion: no-preference){ .barra-inf{ transition:transform .3s ease; } }
+.barra-inf.visible{ transform:none; }
+.barra-inf .btn{ flex:1; }
+.barra-inf .mono{ color:var(--texto2); white-space:nowrap; }
+
+/* ---------- Portada ---------- */
+.portada{
+  min-height:100dvh; padding-top:calc(var(--barra) + 20px); padding-bottom:36px;
+  display:flex; flex-direction:column; justify-content:center;
+}
+.portada .uni{ display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+.portada .uni img{ height:36px; width:auto; }
+.portada .uni p{ font-family:var(--mono); font-size:.68rem; line-height:1.35; color:var(--texto2); max-width:30ch; }
+.portada h1{
+  font-weight:700; font-size:clamp(3.4rem, 18.5vw, 9rem); line-height:.9; letter-spacing:-0.04em;
+  margin:0 0 14px -0.04em; display:flex; white-space:nowrap;
+}
+.portada h1 .l{ display:inline-block; overflow:hidden; padding-bottom:.06em; margin-bottom:-.06em; }
+.portada h1 .l span{ display:inline-block; will-change:transform; }
+.portada .regla{ height:1px; background:var(--tinta); transform-origin:left center; margin-bottom:18px; }
+.portada .titulo{
+  font-family:var(--cuerpo); font-weight:500; font-size:1.05rem; line-height:1.35; letter-spacing:-0.005em;
+  max-width:34ch; text-wrap:balance; margin-bottom:22px;
+}
+.portada .acciones{ display:flex; flex-wrap:wrap; gap:10px; }
+
+/* Tabla de portada (etiqueta | valor) */
+.tabla-meta{ margin:0 0 24px; }
+.tabla-meta .fila{ display:grid; grid-template-columns:5.5rem 1fr; gap:12px; padding:9px 0; border-top:1px solid var(--linea); }
+.tabla-meta .fila:last-child{ border-bottom:1px solid var(--linea); }
+.tabla-meta dt{ font-family:var(--mono); font-size:.74rem; color:var(--texto2); padding-top:.2em; }
+.tabla-meta dd{ margin:0; font-size:.95rem; line-height:1.4; }
+.tabla-meta dd a{ color:inherit; }
+
+/* ---------- I. El problema (prosa + notas al margen) ---------- */
+.prosa{ display:grid; grid-template-columns:1fr; gap:40px; }
+.prosa .cuerpo p + p{ margin-top:1.2em; }
+.notas{ border-top:1px solid var(--cobalto); padding-top:20px; position:relative; }
+.notas::before{ content:""; position:absolute; top:-1px; left:32px; right:0; height:1px; background:var(--papel); }
+.notas ol{ list-style:none; margin:0; padding:0; display:grid; gap:18px; }
+.notas h3{ font-family:var(--cuerpo); font-weight:600; font-size:.9rem; margin-bottom:.15em; text-wrap:pretty; }
+.notas p{ font-size:.9rem; line-height:1.5; color:var(--texto2); }
+.interrogante{ margin-top:56px; display:grid; grid-template-columns:6rem 1fr; gap:14px; padding:20px 0; border-top:1px solid var(--linea); border-bottom:1px solid var(--linea); }
+.interrogante .etiqueta{ font-family:var(--mono); font-size:.74rem; color:var(--texto2); padding-top:.45em; }
+.interrogante blockquote{ margin:0; font-family:var(--display); font-weight:500; font-size:1.3rem; line-height:1.3; letter-spacing:-0.015em; text-wrap:pretty; }
+
+/* ---------- II. Objetivos (tabla) ---------- */
+.tabla-obj{ margin:0; }
+.tabla-obj .fila{ display:grid; grid-template-columns:1fr; gap:6px; padding:20px 0; }
+.tabla-obj .fila + .fila{ border-top:1px solid var(--linea); }
+.tabla-obj dt{ font-family:var(--mono); font-size:.74rem; color:var(--texto2); }
+.tabla-obj dd{ margin:0; max-width:62ch; }
+.tabla-obj dd strong{ display:block; font-weight:600; margin-bottom:.15em; }
+.tabla-obj .general dd{ font-family:var(--display); font-weight:500; font-size:1.25rem; line-height:1.3; letter-spacing:-0.01em; }
+
+/* ---------- III. El sistema (figuras) ---------- */
+.figuras{ display:grid; grid-template-columns:1fr; gap:44px; }
+.figura{ margin:0; }
+.figura picture, .figura img{ display:block; width:100%; }
+.figura .marco{
+  margin-inline:calc(var(--gutter) * -1); background:var(--superficie);
+  border-top:1px solid var(--tinta-20); border-bottom:1px solid var(--tinta-20);
+  will-change:clip-path;
+}
+.figura img{ aspect-ratio:1680/945; object-fit:cover; }
+.figura figcaption{ padding-top:12px; font-size:.95rem; line-height:1.5; color:var(--texto2); max-width:62ch; }
+.figura figcaption .num{ font-family:var(--mono); font-size:.78rem; color:var(--tinta); margin-right:.5em; }
+.capacidades{ margin:64px 0 0; padding:0; list-style:none; display:grid; grid-template-columns:1fr; gap:14px 40px; border-top:1px solid var(--linea); padding-top:32px; }
+.capacidades li{ display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; font-size:1rem; line-height:1.45; }
+.capacidades .ph{ color:var(--cobalto); font-size:1.35rem; line-height:1.1; }
+.stack{ margin-top:44px; font-size:1.2rem; line-height:1.45; letter-spacing:-0.005em; max-width:62ch; text-wrap:pretty; }
+
+/* ---------- IV. Metodología (fila de fases) ---------- */
+.metodo-intro{ max-width:62ch; margin-bottom:32px; color:var(--texto2); }
+.fases{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:1fr; }
+.fases li{ padding:20px 0; border-top:1px solid var(--linea); }
+.fases li:last-child{ border-bottom:1px solid var(--linea); }
+.fases h3{ font-weight:600; font-size:1.2rem; letter-spacing:-0.015em; margin-bottom:.35em; }
+.fases p{ font-size:.95rem; color:var(--texto2); line-height:1.5; }
+
+/* ---------- V. Validación (tabla de resultados) ---------- */
+.valid-intro{ max-width:62ch; margin-bottom:32px; font-size:1.15rem; line-height:1.45; text-wrap:pretty; }
+.resultados{ list-style:none; margin:0; padding:0; }
+.resultados li{ display:grid; grid-template-columns:1fr auto; gap:16px; align-items:baseline; padding:14px 0; }
+.resultados li + li{ border-top:1px solid var(--linea); }
+.resultados .item{ font-size:1rem; line-height:1.4; }
+.resultados .cifra{ font-family:var(--mono); font-weight:500; font-size:1.4rem; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; letter-spacing:-0.01em; }
+.resultados .cifra small{ font-size:.7em; font-weight:400; color:var(--texto2); margin-left:.15em; }
+.valid-nota{ margin-top:20px; font-family:var(--mono); font-size:.78rem; color:var(--texto2); }
+
+/* ---------- VI. Autores ---------- */
+.autores{ display:grid; grid-template-columns:1fr; gap:32px; }
+.autor h3{ font-weight:600; font-size:1.4rem; letter-spacing:-0.02em; line-height:1.15; margin-bottom:.3em; }
+.autor p{ color:var(--texto2); margin-bottom:.6em; }
+.autor a{ display:inline-flex; align-items:center; gap:.4rem; font-weight:500; }
+.autor a .ph{ font-size:1.2em; }
+.tutor{ margin-top:36px; padding-top:20px; border-top:1px solid var(--linea); display:grid; grid-template-columns:5.5rem 1fr; gap:12px; }
+.tutor dt{ font-family:var(--mono); font-size:.74rem; color:var(--texto2); padding-top:.25em; }
+.tutor dd{ margin:0; }
+
+/* ---------- Anexo. Tesis (contraportada, única inversión) ---------- */
+.anexo{ background:var(--tinta); color:var(--papel); padding-block:72px calc(28px + env(safe-area-inset-bottom)); margin-top:24px; }
+.anexo h2{ font-weight:600; font-size:clamp(2rem, 7vw, 3rem); letter-spacing:-0.03em; line-height:1; margin-bottom:20px; }
+.anexo .lead{ font-size:1.1rem; line-height:1.5; max-width:48ch; color:rgba(245,246,248,.82); margin-bottom:28px; text-wrap:pretty; }
+.anexo .acciones{ display:grid; gap:14px; margin-bottom:40px; }
+.anexo .accion{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.anexo .accion .mono{ color:rgba(245,246,248,.7); }
+.anexo ::selection{ background:var(--papel); color:var(--tinta); }
+.qr-bloque{ display:flex; align-items:center; gap:20px; }
+.qr{ width:160px; height:160px; flex:0 0 160px; background:#fff; padding:12px; }
+.qr svg{ display:block; width:100%; height:100%; }
+.qr-bloque p{ font-size:.95rem; line-height:1.45; color:rgba(245,246,248,.82); max-width:18ch; }
+.qr-bloque .mono{ display:block; margin-top:.4em; color:rgba(245,246,248,.6); word-break:break-all; }
+.pie{ margin-top:56px; padding-top:20px; border-top:1px solid var(--papel-20); display:grid; gap:6px; font-family:var(--mono); font-size:.74rem; line-height:1.5; color:rgba(245,246,248,.7); }
+.pie a{ color:inherit; }
+
+/* ============================================================
+   >= 768px (tableta): nav en la barra, columnas
+   ============================================================ */
+@media (min-width: 768px){
+  :root{ --gutter:32px; --barra:64px; }
+  .barra .cap-actual{ margin-left:auto; margin-right:20px; }
+  .barra .btn{ display:inline-flex; }
+  .barra .nav a{ font-family:var(--cuerpo); font-weight:500; font-size:.9rem; color:var(--tinta); text-decoration:none; }
+  .barra .nav a:hover{ color:var(--cobalto); }
+  .barra .nav a .n{ font-family:var(--mono); font-size:.72rem; color:var(--texto2); margin-right:.35em; }
+  .barra-inf{ display:none; }
+  .capitulo{ padding-block:96px; }
+  .capitulo + .capitulo .contenido{ padding-top:80px; }
+  .capitulo h2{ margin-bottom:48px; }
+  .portada{ padding-top:calc(var(--barra) + 32px); }
+  .portada .uni img{ height:44px; }
+  .portada .uni p{ font-size:.74rem; max-width:none; }
+  .portada .titulo{ font-size:1.25rem; max-width:44ch; }
+  .prosa{ grid-template-columns:minmax(0,62ch) 260px; gap:56px; align-items:start; }
+  .notas{ border-top:0; padding-top:0; }
+  .notas::before{ display:none; }
+  .notas ol{ gap:22px; }
+  .notas li{ border-top:1px solid var(--linea); padding-top:12px; }
+  .interrogante{ grid-template-columns:11rem 1fr; gap:32px; padding:28px 0; }
+  .interrogante blockquote{ font-size:1.5rem; }
+  .tabla-obj .fila{ grid-template-columns:9rem 1fr; gap:24px; padding:24px 0; }
+  .tabla-obj dt{ padding-top:.35em; }
+  .figuras{ gap:56px; }
+  .figura .marco{ margin-inline:0; border:1px solid var(--tinta-20); }
+  .capacidades{ grid-template-columns:1fr 1fr; gap:16px 48px; margin-top:80px; padding-top:40px; }
+  .stack{ font-size:1.35rem; margin-top:56px; }
+  .fases{ grid-template-columns:repeat(4, 1fr); }
+  .fases li{ padding:8px 24px 8px 24px; border-top:0; border-left:1px solid var(--linea); }
+  .fases li:first-child{ padding-left:0; border-left:0; }
+  .fases li:last-child{ border-bottom:0; }
+  .resultados{ max-width:760px; }
+  .resultados li{ padding:16px 0; }
+  .resultados .item{ font-size:1.05rem; }
+  .resultados .cifra{ font-size:1.6rem; }
+  .autores{ grid-template-columns:1fr 1fr; gap:48px; }
+  .anexo{ padding-block:96px 40px; margin-top:32px; }
+  .anexo .cuerpo-anexo{ display:grid; grid-template-columns:1fr auto; gap:48px; align-items:end; }
+  .anexo .acciones{ margin-bottom:0; }
+  .qr-bloque{ flex-direction:column; align-items:flex-start; gap:14px; }
+}
+
+/* ============================================================
+   >= 1100px (escritorio): riel fijo izquierdo, portada asimétrica
+   ============================================================ */
+@media (min-width: 1100px){
+  :root{ --riel:72px; --gutter:48px; }
+  .riel{
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:30px;
+    position:fixed; left:0; top:var(--barra); bottom:0; width:var(--riel); z-index:39;
+    background:var(--papel); border-right:1px solid var(--linea); padding-top:44px;
+  }
+  .riel a{ font-family:var(--mono); font-weight:500; font-size:.82rem; color:var(--tinta-35); text-decoration:none; padding:4px 8px; }
+  .riel a:hover{ color:var(--tinta); }
+  .riel a.activo{ color:var(--cobalto); }
+  .riel .relleno{ position:absolute; top:0; right:-1px; width:2px; height:100%; background:var(--cobalto); transform:scaleY(0); transform-origin:top center; will-change:transform; }
+  .barra .progreso{ display:none; }
+  .barra .nav{ display:flex; gap:28px; }
+  .barra .cap-actual{ display:none; }
+  .capitulo{ padding-block:120px; }
+  .capitulo + .capitulo .contenido{ padding-top:96px; }
+  .portada{ padding-top:calc(var(--barra) + 40px); padding-bottom:64px; }
+  .portada .contenido{ display:grid; grid-template-columns:repeat(12, 1fr); column-gap:32px; align-items:end; }
+  .portada .izq{ grid-column:1 / span 8; }
+  .portada .der{ grid-column:9 / span 4; align-self:end; }
+  .portada .uni{ margin-bottom:40px; }
+  .portada h1{ font-size:clamp(3.4rem, 10vw, 9rem); margin-bottom:22px; }
+  .portada .regla{ margin-bottom:24px; }
+  .portada .titulo{ font-size:1.35rem; max-width:40ch; margin-bottom:0; }
+  .tabla-meta{ margin-bottom:28px; }
+  .tabla-meta .fila{ grid-template-columns:6rem 1fr; padding:11px 0; }
+  .portada .acciones{ margin-top:0; }
+  .prosa{ gap:72px; }
+  .interrogante{ margin-top:80px; grid-template-columns:12rem 1fr; }
+  .interrogante blockquote{ font-size:1.6rem; max-width:34ch; }
+  .figuras{ grid-template-columns:1fr 1fr; gap:56px 40px; }
+  .figura.ancha{ grid-column:1 / -1; }
+  .figura figcaption{ font-size:1rem; }
+  .fases li{ padding-inline:32px; }
+  .anexo{ padding-block:120px 48px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Barra superior: móvil = marca + capítulo actual + progreso; escritorio = marca + nav + PDF -->
+<header class="barra" role="banner">
+  <a class="marca" href="#top" aria-label="SIMCODVE, inicio">SIMCODVE</a>
+  <nav class="nav" aria-label="Capítulos">
+    <a href="#problema"><span class="n">I</span>El problema</a>
+    <a href="#objetivos"><span class="n">II</span>Objetivos</a>
+    <a href="#sistema"><span class="n">III</span>El sistema</a>
+    <a href="#metodologia"><span class="n">IV</span>Metodología</a>
+    <a href="#resultados"><span class="n">V</span>Validación</a>
+    <a href="#autores"><span class="n">VI</span>Autores</a>
+  </nav>
+  <span class="cap-actual" id="cap-actual" aria-live="polite">Portada</span>
+  <a class="btn btn-primario btn-sm" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener"><i class="ph ph-file-pdf" aria-hidden="true"></i>Ver tesis en PDF</a>
+  <span class="progreso" id="progreso" aria-hidden="true"></span>
+</header>
+
+<!-- Riel de capítulos (escritorio) -->
+<aside class="riel" id="riel" aria-label="Riel de capítulos">
+  <a href="#problema" data-riel="I" title="El problema">I</a>
+  <a href="#objetivos" data-riel="II" title="Objetivos">II</a>
+  <a href="#sistema" data-riel="III" title="El sistema">III</a>
+  <a href="#metodologia" data-riel="IV" title="Metodología">IV</a>
+  <a href="#resultados" data-riel="V" title="Validación">V</a>
+  <a href="#autores" data-riel="VI" title="Autores">VI</a>
+  <span class="relleno" id="riel-relleno" aria-hidden="true"></span>
+</aside>
+
+<main id="top">
+
+  <!-- Portada -->
+  <section class="portada" id="portada" aria-label="Portada">
+    <div class="contenido">
+      <div class="izq">
+        <div class="uni">
+          <img src="/sistema/webp/unefa.webp" width="182" height="224" alt="Escudo de la UNEFA" loading="eager" fetchpriority="high" decoding="async">
+          <p>Universidad Nacional Experimental Politécnica de la Fuerza Armada Nacional Bolivariana</p>
+        </div>
+        <h1 aria-label="SIMCODVE" id="nombre">
+          <span class="l" aria-hidden="true"><span>S</span></span><span class="l" aria-hidden="true"><span>I</span></span><span class="l" aria-hidden="true"><span>M</span></span><span class="l" aria-hidden="true"><span>C</span></span><span class="l" aria-hidden="true"><span>O</span></span><span class="l" aria-hidden="true"><span>D</span></span><span class="l" aria-hidden="true"><span>V</span></span><span class="l" aria-hidden="true"><span>E</span></span>
+        </h1>
+        <div class="regla" id="regla" aria-hidden="true"></div>
+        <p class="titulo" id="titulo-tesis">Diseño de un Sistema de Monitoreo y Control de Drones en el Contexto Venezolano: Un Enfoque Tecnológico para la Defensa, Disuasión e Innovación Híbrida</p>
+      </div>
+      <div class="der" id="portada-der">
+        <dl class="tabla-meta">
+          <div class="fila"><dt>Autores</dt><dd>Diego Rodríguez<br>Yoneiker Azocar</dd></div>
+          <div class="fila"><dt>Tutor</dt><dd>Rodolfo Caccamo</dd></div>
+          <div class="fila"><dt>Sede</dt><dd>Núcleo Altos Mirandinos, Los Teques</dd></div>
+          <div class="fila"><dt>Fecha</dt><dd>Junio 2026</dd></div>
+        </dl>
+        <div class="acciones">
+          <a class="btn btn-primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener"><i class="ph ph-file-pdf" aria-hidden="true"></i>Ver tesis en PDF</a>
+          <a class="btn" href="#sistema">Explorar el sistema<i class="ph ph-arrow-down" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- I. El problema -->
+  <section class="capitulo" id="problema" data-cap="I" data-nombre="El problema">
+    <div class="contenido">
+      <h2><span class="num">I.</span>El problema</h2>
+      <div class="prosa">
+        <div class="cuerpo medida">
+          <p>El reto ya no es construir el dron, sino el software que monitorea y controla muchas unidades a la vez y sigue operando ante fallas de enlace, pérdida de nodos o guerra electrónica. Un operador que gobierna un solo dron por un enlace punto a punto, con software cerrado y extranjero, pierde la misión en cuanto cae el enlace o aparece interferencia.</p>
+          <p>En Venezuela esa capacidad soberana aún no existe. SIMCODVE propone lo contrario: un operador coordina el enjambre completo en red, con software propio y auditable, sin punto único de falla y resiliente a la pérdida de nodos y a la interferencia.</p>
+        </div>
+        <aside class="notas" aria-label="Raíces del problema">
+          <ol>
+            <li><h3>Acceso restringido</h3><p>Restricciones comerciales y presupuestarias a plataformas avanzadas.</p></li>
+            <li><h3>Sin software soberano</h3><p>Falta desarrollo propio y auditable para arquitecturas distribuidas.</p></li>
+            <li><h3>Baja resiliencia</h3><p>Los sistemas convencionales fallan ante interferencia o caída de enlaces.</p></li>
+            <li><h3>Sin control descentralizado</h3><p>Sin consenso ni autonomía, la misión depende de un punto único.</p></li>
+          </ol>
+        </aside>
+      </div>
+      <div class="interrogante">
+        <span class="etiqueta">Interrogante principal</span>
+        <blockquote>¿Cómo debe estructurarse el diseño conceptual y metodológico de un sistema de monitoreo y control de drones que fortalezca la defensa integral, la capacidad de disuasión y la innovación tecnológica híbrida en el contexto venezolano?</blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- II. Objetivos -->
+  <section class="capitulo" id="objetivos" data-cap="II" data-nombre="Objetivos">
+    <div class="contenido">
+      <h2><span class="num">II.</span>Objetivos</h2>
+      <dl class="tabla-obj">
+        <div class="fila general">
+          <dt>General</dt>
+          <dd>Diseñar conceptual y metodológicamente un sistema de monitoreo y control de drones para el contexto venezolano, enfocado en la defensa integral, la disuasión y la innovación híbrida.</dd>
+        </div>
+        <div class="fila">
+          <dt>Específico</dt>
+          <dd><strong>Requerimientos operacionales</strong>Determinar las especificaciones críticas del sistema.</dd>
+        </div>
+        <div class="fila">
+          <dt>Específico</dt>
+          <dd><strong>Arquitectura SOA y gemelos digitales</strong>Diseñar una arquitectura orientada a servicios para simular y controlar enjambres en tiempo real.</dd>
+        </div>
+        <div class="fila">
+          <dt>Específico</dt>
+          <dd><strong>Control descentralizado y consenso</strong>Formular el modelo y los algoritmos que garantizan autonomía y resiliencia ante pérdida de nodos o interferencia.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- III. El sistema -->
+  <section class="capitulo" id="sistema" data-cap="III" data-nombre="El sistema">
+    <div class="contenido">
+      <h2><span class="num">III.</span>El sistema</h2>
+      <div class="figuras">
+        <figure class="figura ancha">
+          <div class="marco">
+            <picture>
+              <source media="(max-width: 767px)" srcset="/sistema/webp/g04_mapa_enjambres-m.webp">
+              <img src="/sistema/webp/g04_mapa_enjambres.webp" width="1680" height="945" alt="Mapa satelital de Los Teques con tres enjambres de drones y sus zonas asignadas" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <figcaption><span class="num">Figura 1.</span>Mapa satelital real de Los Teques con tres enjambres desplegados y sus zonas asignadas. Cada dron es un gemelo digital con posición, velocidad, altitud y batería.</figcaption>
+        </figure>
+        <figure class="figura">
+          <div class="marco">
+            <picture>
+              <source media="(max-width: 767px)" srcset="/sistema/webp/g10_radar-m.webp">
+              <img src="/sistema/webp/g10_radar.webp" width="1680" height="945" alt="Vista de radar verde con anillos de distancia y barrido" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <figcaption><span class="num">Figura 2.</span>Vista tipo radar con anillos de distancia y barrido sobre las unidades activas.</figcaption>
+        </figure>
+        <figure class="figura">
+          <div class="marco">
+            <picture>
+              <source media="(max-width: 767px)" srcset="/sistema/webp/g09_modo_defensa-m.webp">
+              <img src="/sistema/webp/g09_modo_defensa.webp" width="1680" height="945" alt="Enjambre formando un anillo de defensa sobre el mapa" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <figcaption><span class="num">Figura 3.</span>Modo defensa: el enjambre forma un anillo perimetral estático alrededor de la zona asignada.</figcaption>
+        </figure>
+        <figure class="figura ancha">
+          <div class="marco">
+            <picture>
+              <source media="(max-width: 767px)" srcset="/sistema/webp/g11_interferencia-m.webp">
+              <img src="/sistema/webp/g11_interferencia.webp" width="1680" height="945" alt="Zona roja de interferencia sobre el mapa satelital" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <figcaption><span class="num">Figura 4.</span>Inyección de fallos: zona roja de interferencia (jamming) sobre el mapa. Los drones dentro pierden señal y el enjambre debe recuperar la conectividad.</figcaption>
+        </figure>
+      </div>
+
+      <ul class="capacidades" aria-label="Capacidades del prototipo">
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Despliegue de enjambres sobre el mapa satelital real de Venezuela.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Telemetría y gemelo digital de cada unidad: posición, velocidad, altitud y batería.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Modos de patrullaje, defensa e híbrido.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Inyección de fallos e interferencia (jamming).</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Batería y retorno automático a base.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Alertas clasificadas.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Métricas e historial exportables: conectividad, cobertura, coherencia y recuperación.</span></li>
+        <li><i class="ph ph-check-square" aria-hidden="true"></i><span>Pausa, reanudar, reiniciar y escenarios reproducibles con semilla.</span></li>
+      </ul>
+
+      <p class="stack">Construido con software libre: React 18 y Vite en el frontend, Leaflet con imágenes Esri World Imagery para el mapa, Python 3.11 y FastAPI en el backend con un WebSocket de telemetría a 10 Hz, y Docker para el despliegue.</p>
+    </div>
+  </section>
+
+  <!-- IV. Metodología -->
+  <section class="capitulo" id="metodologia" data-cap="IV" data-nombre="Metodología">
+    <div class="contenido">
+      <h2><span class="num">IV.</span>Proyecto factible bajo Desarrollo Rápido de Aplicaciones</h2>
+      <p class="metodo-intro">Enfoque cuantitativo, aplicado y tecnológico-proyectivo. El desarrollo siguió las cuatro fases del RAD.</p>
+      <ol class="fases">
+        <li><h3>Requerimientos</h3><p>Determinar las especificaciones críticas del sistema de monitoreo y control.</p></li>
+        <li><h3>Diseño con el usuario</h3><p>Arquitectura orientada a servicios y modelo de control revisados con los usuarios.</p></li>
+        <li><h3>Construcción rápida</h3><p>Prototipo funcional del simulador en iteraciones cortas.</p></li>
+        <li><h3>Transición y validación</h3><p>Evaluación de la propuesta por especialistas de la UNEFA.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- V. Validación -->
+  <section class="capitulo" id="resultados" data-cap="V" data-nombre="Validación">
+    <div class="contenido">
+      <h2><span class="num">V.</span>Validación</h2>
+      <p class="valid-intro">12 especialistas de la UNEFA evaluaron la propuesta con escala Likert. Ocho ítems alcanzaron aprobación unánime.</p>
+      <ol class="resultados" id="resultados-tabla">
+        <li><span class="item">Necesidad del prototipo académico</span><span class="cifra" data-valor="100" data-dec="0">100<small>%</small></span></li>
+        <li><span class="item">Contribución a la formación tecnológica</span><span class="cifra" data-valor="100" data-dec="0">100<small>%</small></span></li>
+        <li><span class="item">Aporte a la soberanía tecnológica</span><span class="cifra" data-valor="100" data-dec="0">100<small>%</small></span></li>
+        <li><span class="item">Utilidad de la interfaz tipo radar</span><span class="cifra" data-valor="100" data-dec="0">100<small>%</small></span></li>
+        <li><span class="item">Ventajas de la arquitectura modular</span><span class="cifra" data-valor="100" data-dec="0">100<small>%</small></span></li>
+        <li><span class="item">Relación con la defensa integral</span><span class="cifra" data-valor="91.67" data-dec="2">91,67<small>%</small></span></li>
+        <li><span class="item">Adecuación de los datos sintéticos</span><span class="cifra" data-valor="91.67" data-dec="2">91,67<small>%</small></span></li>
+      </ol>
+      <p class="valid-nota">Porcentaje de acuerdo por ítem. 12 especialistas de 25 convocados.</p>
+    </div>
+  </section>
+
+  <!-- VI. Autores -->
+  <section class="capitulo" id="autores" data-cap="VI" data-nombre="Autores">
+    <div class="contenido">
+      <h2><span class="num">VI.</span>Autores</h2>
+      <div class="autores">
+        <div class="autor">
+          <h3>Diego Rodríguez</h3>
+          <p>Aspirante a Ingeniero de Sistemas</p>
+          <a href="https://github.com/D13G0ARJ" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>github.com/D13G0ARJ</a>
+        </div>
+        <div class="autor">
+          <h3>Yoneiker Azocar</h3>
+          <p>Aspirante a Ingeniero de Sistemas</p>
+          <a href="https://github.com/AlexanderAzocar" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>github.com/AlexanderAzocar</a>
+        </div>
+      </div>
+      <dl class="tutor">
+        <dt>Tutor</dt>
+        <dd>Rodolfo Caccamo</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- Anexo. Tesis (contraportada) -->
+  <section class="anexo" id="tesis" data-cap="Anexo" data-nombre="Tesis">
+    <div class="contenido">
+      <div class="cuerpo-anexo">
+        <div>
+          <h2>Lee la tesis completa</h2>
+          <p class="lead">139 páginas: marco teórico, arquitectura, control descentralizado, validación por expertos y el prototipo.</p>
+          <div class="acciones">
+            <div class="accion">
+              <a class="btn btn-primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener"><i class="ph ph-file-pdf" aria-hidden="true"></i>Ver tesis en PDF</a>
+              <span class="mono">PDF · 19,5 MB</span>
+            </div>
+            <div class="accion">
+              <a class="btn btn-papel" href="https://github.com/D13G0ARJ/SIMCODVE-sistema-de-monitoreo-y-control-de-drones-en-el-contexto-venezolano" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>Repositorio en GitHub</a>
+            </div>
+          </div>
+        </div>
+        <div class="qr-bloque">
+          <div class="qr" id="qr" aria-label="Código QR de esta página"></div>
+          <p>Escanea para abrir esta página.<span class="mono" id="qr-url">simcodve.vercel.app</span></p>
+        </div>
+      </div>
+      <footer class="pie">
+        <p>© 2026 Diego Rodríguez y Yoneiker Azocar · UNEFA</p>
+        <p>Prototipo académico con datos 100 % sintéticos.</p>
+      </footer>
+    </div>
+  </section>
+
+</main>
+
+<!-- Barra inferior fija (móvil) -->
+<div class="barra-inf" id="barra-inf">
+  <a class="btn btn-primario" href="/TEG-SIMCODVE-Rodriguez-Azocar.pdf" target="_blank" rel="noopener"><i class="ph ph-file-pdf" aria-hidden="true"></i>Ver tesis en PDF</a>
+  <span class="mono">19,5 MB</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  var URL_PUBLICA = 'https://simcodve.vercel.app';
+
+  /* ---------- QR ---------- */
+  try{
+    var q = qrcode(0, 'M'); q.addData(URL_PUBLICA); q.make();
+    document.getElementById('qr').innerHTML = q.createSvgTag({ scalable:true, margin:0 });
+    document.getElementById('qr-url').textContent = URL_PUBLICA.replace(/^https?:\/\//, '');
+  }catch(e){}
+
+  if (!window.gsap || !window.ScrollTrigger) return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  var capActual = document.getElementById('cap-actual');
+  var progreso  = document.getElementById('progreso');
+  var rielLinks = document.querySelectorAll('#riel a[data-riel]');
+  var secciones = document.querySelectorAll('[data-cap]');
+  var barraInf  = document.getElementById('barra-inf');
+  var portada   = document.getElementById('portada');
+  var tesis     = document.getElementById('tesis');
+
+  /* ---------- Capítulo actual (siempre, con o sin reduce-motion) ---------- */
+  function marcarCapitulo(sec){
+    if (!sec){
+      capActual.textContent = 'Portada';
+      rielLinks.forEach(function(a){ a.classList.remove('activo'); });
+      return;
+    }
+    capActual.textContent = sec.dataset.cap + ' · ' + sec.dataset.nombre;
+    rielLinks.forEach(function(a){ a.classList.toggle('activo', a.dataset.riel === sec.dataset.cap); });
+  }
+  ScrollTrigger.create({
+    trigger: portada, start: 'top top', end: 'bottom 50%',
+    onToggle: function(self){ if (self.isActive) marcarCapitulo(null); }
+  });
+  secciones.forEach(function(sec){
+    ScrollTrigger.create({
+      trigger: sec, start: 'top 50%', end: 'bottom 50%',
+      onToggle: function(self){ if (self.isActive) marcarCapitulo(sec); }
+    });
+  });
+
+  /* ---------- Barra inferior móvil: aparece al salir la portada, se oculta en el anexo ---------- */
+  var fueraPortada = false, enTesis = false;
+  function actualizarBarraInf(){ barraInf.classList.toggle('visible', fueraPortada && !enTesis); }
+  ScrollTrigger.create({
+    trigger: portada, start: 'bottom 56px',
+    onEnter: function(){ fueraPortada = true; actualizarBarraInf(); },
+    onLeaveBack: function(){ fueraPortada = false; actualizarBarraInf(); }
+  });
+  ScrollTrigger.create({
+    trigger: tesis, start: 'top 80%',
+    onEnter: function(){ enTesis = true; actualizarBarraInf(); },
+    onLeaveBack: function(){ enTesis = false; actualizarBarraInf(); }
+  });
+
+  /* ---------- Movimiento (solo sin reduce-motion) ---------- */
+  var mm = gsap.matchMedia();
+  mm.add('(prefers-reduced-motion: no-preference)', function(){
+
+    /* Portada: revelado de letras, regla y contenido */
+    var tl = gsap.timeline({ defaults:{ ease:'expo.out' } });
+    tl.from('#nombre .l span', { yPercent:100, duration:.9, stagger:.04 })
+      .fromTo('#regla', { scaleX:0 }, { scaleX:1, duration:.7, ease:'power3.inOut' }, '-=.45')
+      .from(['#titulo-tesis', '#portada-der'], { autoAlpha:0, y:14, duration:.7, stagger:.08, clearProps:'all' }, '-=.3');
+
+    /* Barra móvil: progreso dentro del capítulo actual */
+    secciones.forEach(function(sec){
+      ScrollTrigger.create({
+        trigger: sec, start: 'top 50%', end: 'bottom 50%',
+        onUpdate: function(self){ gsap.set(progreso, { scaleX: self.progress }); },
+        onLeaveBack: function(){ gsap.set(progreso, { scaleX: 0 }); }
+      });
+    });
+
+    /* Riel de escritorio: línea vertical que se llena de I a Anexo */
+    ScrollTrigger.create({
+      trigger: '#problema', start: 'top 50%', endTrigger: '#tesis', end: 'bottom bottom',
+      onUpdate: function(self){ gsap.set('#riel-relleno', { scaleY: self.progress }); }
+    });
+
+    /* Figuras: una máscara que baja, como una figura más del informe */
+    gsap.utils.toArray('.figura .marco').forEach(function(marco){
+      gsap.from(marco, {
+        clipPath: 'inset(0 0 100% 0)', duration:.9, ease:'expo.out',
+        scrollTrigger: { trigger: marco, start: 'top 82%', once: true }
+      });
+    });
+
+    /* Validación: contadores */
+    var cifras = document.querySelectorAll('#resultados-tabla .cifra');
+    ScrollTrigger.create({
+      trigger: '#resultados-tabla', start: 'top 80%', once: true,
+      onEnter: function(){
+        cifras.forEach(function(el, i){
+          var fin = parseFloat(el.dataset.valor), dec = parseInt(el.dataset.dec, 10) || 0;
+          var obj = { v: 0 };
+          var paso = dec ? 0.01 : 1;
+          gsap.to(obj, {
+            v: fin, duration: 1.4, delay: i * .08, ease: 'power2.out', snap: { v: paso },
+            onUpdate: function(){
+              el.innerHTML = obj.v.toLocaleString('es', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + '<small>%</small>';
+            }
+          });
+        });
+      }
+    });
+
+    return function(){};
+  });
+
+  window.addEventListener('load', function(){ ScrollTrigger.refresh(); });
+})();
+</script>
+</body>
+</html>
