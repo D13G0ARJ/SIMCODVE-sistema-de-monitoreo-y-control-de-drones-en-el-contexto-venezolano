@@ -88,10 +88,10 @@ export function iniciarAnimaciones(raiz) {
 
       /* Continuidad: el resto de la página en patrullaje atenuado; la tesis vuelve a disperso. */
       gsap.fromTo(estado, { fase: 4, opacidad: 1 }, {
-        fase: 1, opacidad: 0.38, ease: 'none', immediateRender: false,
+        fase: 1, opacidad: 0.3, ease: 'none', immediateRender: false,
         scrollTrigger: { trigger: '.raices', start: 'top bottom', end: 'top 25%', scrub: 0.8 },
       })
-      gsap.fromTo(estado, { fase: 1, opacidad: 0.38 }, {
+      gsap.fromTo(estado, { fase: 1, opacidad: 0.3 }, {
         fase: 0, opacidad: 1, ease: 'none', immediateRender: false,
         scrollTrigger: { trigger: '#tesis', start: 'top 85%', end: 'top 30%', scrub: 0.8 },
       })

@@ -144,18 +144,32 @@ h2 { font-size: clamp(1.7rem, 5.6vw, 2.5rem); line-height: 1.1; letter-spacing: 
 .historia.js .escena .in { position: relative; }
 
 .raices { background: rgba(7, 11, 20, .86); border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); }
-.raices .intro { font-size: 1.06rem; color: var(--texto2); max-width: 60ch; margin-top: 1rem; }
-.raices-lista { list-style: none; margin: 2rem 0 0; padding: 0; display: grid; }
+.prosa { display: grid; gap: 1rem; margin-top: 1.25rem; max-width: 62ch; }
+.prosa p { font-size: 1.06rem; color: var(--texto2); }
+h3.sub { font-size: 1.15rem; font-weight: 600; margin-top: 2.75rem; }
+.raices-lista { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; }
 .raices-lista li { padding: 1.2rem 0; border-top: 1px solid var(--linea); }
 .raices-lista strong { display: block; font: 600 1.12rem/1.25 var(--sora); margin-bottom: .35rem; }
 .raices-lista span { color: var(--texto2); font-size: .98rem; }
+.consecuencia { color: var(--texto2); font-size: 1.06rem; max-width: 62ch; margin-top: 2.25rem; }
+.interrogante { margin: 2.75rem 0 0; padding: 0 0 0 1.25rem; border-left: 1px solid var(--acento); max-width: 44ch; }
+.interrogante .meta { display: block; margin-bottom: .6rem; }
+.interrogante p { font: 500 clamp(1.25rem, 4.2vw, 1.75rem)/1.35 var(--sora); letter-spacing: -.015em; text-wrap: balance; }
 
 /* Objetivos */
-.declaracion { font: 500 clamp(1.4rem, 4.6vw, 2.2rem)/1.3 var(--sora); letter-spacing: -.015em; max-width: 38ch; margin-top: 1.25rem; }
-.especificos { display: grid; gap: 1.5rem; margin-top: 2.5rem; }
-.especificos > div { padding-top: 1.25rem; border-top: 1px solid var(--linea); }
-.especificos h3 { font-size: 1.1rem; font-weight: 600; line-height: 1.3; margin-bottom: .4rem; }
-.especificos p { color: var(--texto2); font-size: .98rem; }
+.declaracion { font: 500 clamp(1.4rem, 4.6vw, 2.2rem)/1.3 var(--sora); letter-spacing: -.015em; max-width: 38ch; margin-top: .5rem; }
+#objetivos h2 + .meta { display: block; margin-top: 1.5rem; }
+.meta.sub { display: block; margin-top: 2.75rem; }
+.especificos { list-style: none; display: grid; gap: 1.5rem; margin: .75rem 0 0; padding: 0; }
+.especificos li { padding-top: 1.25rem; border-top: 1px solid var(--linea); }
+.especificos .pregunta { color: var(--texto2); font-size: .9rem; line-height: 1.45; margin-bottom: .8rem; }
+.especificos h3 { font-size: 1.1rem; font-weight: 600; line-height: 1.35; margin-bottom: .4rem; }
+.especificos h3 em { font-style: normal; color: var(--acento); }
+.especificos li > p:last-child { color: var(--texto2); font-size: .98rem; }
+.alcance { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 1rem; }
+.alcance li { display: grid; gap: .25rem; padding-top: 1rem; border-top: 1px solid var(--linea); }
+.alcance strong { font: 600 1rem/1.3 var(--sora); }
+.alcance span { color: var(--texto2); font-size: .95rem; }
 
 /* El sistema: galería */
 .sistema { background: var(--fondo); padding-bottom: 5rem; }
@@ -244,7 +258,10 @@ footer .in { display: flex; flex-direction: column; gap: .35rem; }
   .raices-lista li { border-top: 0; border-left: 1px solid var(--linea); padding: .25rem 1.5rem; }
   .raices-lista li:first-child { border-left: 0; padding-left: 0; }
   .especificos { grid-template-columns: repeat(3, 1fr); gap: 3rem; }
-  .especificos > div { border-top: 0; padding-top: 0; }
+  .especificos li { border-top: 0; padding-top: 0; }
+  .alcance { grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
+  .alcance li { border-top: 0; border-left: 1px solid var(--linea); padding: .25rem 0 .25rem 1.25rem; }
+  .alcance li:first-child { border-left: 0; padding-left: 0; }
   .pista { gap: 20px; }
   .panel { min-width: 60vw; }
   .lista-check { grid-template-columns: 1fr 1fr; gap: 1rem 2.5rem; }

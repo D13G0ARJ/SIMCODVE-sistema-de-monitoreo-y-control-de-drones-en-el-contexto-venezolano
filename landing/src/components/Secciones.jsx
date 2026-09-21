@@ -1,40 +1,56 @@
 import { GithubLogo } from '@phosphor-icons/react'
-import { RAICES, OBJETIVO_GENERAL, OBJETIVOS, STACK, FASES, AUTORES } from '../datos'
+import { PROBLEMA, RAICES, OBJETIVO_GENERAL, OBJETIVOS, ALCANCE, STACK, FASES, AUTORES } from '../datos'
 
+/* Capítulo I: planteamiento del problema. */
 export function Raices() {
   return (
     <section className="raices seccion">
       <div className="in">
-        <h2>Cuatro raíces del problema</h2>
-        <p className="intro">
-          El reto ya no es construir el dron sino el software que monitorea y controla muchas unidades a la
-          vez y sigue operando ante fallas de enlace, pérdida de nodos o guerra electrónica. En Venezuela esa
-          capacidad soberana aún no existe.
-        </p>
+        <h2>El problema</h2>
+        <div className="prosa">
+          <p>{PROBLEMA.contexto}</p>
+          <p>{PROBLEMA.venezuela}</p>
+        </div>
+        <h3 className="sub">Cuatro raíces</h3>
         <ul className="raices-lista">
           {RAICES.map((r) => (
             <li key={r.h}><strong>{r.h}</strong><span>{r.p}</span></li>
           ))}
         </ul>
+        <p className="consecuencia">{PROBLEMA.consecuencias}</p>
+        <blockquote className="interrogante">
+          <span className="meta">Interrogante principal</span>
+          <p>{PROBLEMA.interrogante}</p>
+        </blockquote>
       </div>
     </section>
   )
 }
 
+/* Capítulo I: objetivos, con la interrogante secundaria que responde cada específico, y alcance. */
 export function Objetivos() {
   return (
     <section id="objetivos" className="seccion">
       <div className="in">
         <h2>Objetivos</h2>
+        <span className="meta">Objetivo general</span>
         <p className="declaracion">{OBJETIVO_GENERAL}</p>
-        <div className="especificos">
+        <span className="meta sub">Objetivos específicos</span>
+        <ol className="especificos">
           {OBJETIVOS.map((o) => (
-            <div key={o.h}>
-              <h3>{o.h}</h3>
+            <li key={o.v}>
+              <p className="pregunta">{o.q}</p>
+              <h3><em>{o.v}</em> {o.h}</h3>
               <p>{o.p}</p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
+        <h3 className="sub">Alcance y límites</h3>
+        <ul className="alcance">
+          {ALCANCE.map((a) => (
+            <li key={a.h}><strong>{a.h}</strong><span>{a.p}</span></li>
+          ))}
+        </ul>
       </div>
     </section>
   )

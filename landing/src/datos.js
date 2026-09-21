@@ -31,20 +31,55 @@ export const ESCENAS = [
   { h: 'Se recupera y sigue.', p: 'Conectividad, particiones y tiempo de recuperación se miden y se exportan.' },
 ]
 
+/* Capítulo I: planteamiento del problema (redacción de la tesis, condensada). */
+export const PROBLEMA = {
+  contexto:
+    'El despliegue de drones y las operaciones en enjambre transformaron la doctrina de defensa, vigilancia y disuasión a nivel global. El desafío ya no está solo en el hardware: está en arquitecturas de monitoreo y control capaces de gestionar múltiples unidades a la vez y de seguir operando ante ataques cibernéticos, fallas de comunicación o guerra electrónica.',
+  venezuela:
+    'En el contexto venezolano, y en la investigación que impulsa la UNEFA, el uso de plataformas no tripuladas sigue limitado por esquemas fragmentados, procesos manuales, enlaces de radio punto a punto donde un operador controla un solo vehículo, y software comercial cerrado que no está hecho para enjambres en red ni para la topografía y el entorno radioeléctrico nacional.',
+  consecuencias:
+    'Sin un sistema unificado y adaptable se limita la coordinación de operaciones en enjambre y con ella la capacidad de supervisión, respuesta y disuasión. En lo académico, el rezago en paradigmas como la arquitectura orientada a servicios (SOA) y los gemelos digitales frena la producción de conocimiento endógeno y la innovación tecnológica híbrida.',
+  interrogante:
+    '¿Cómo debe estructurarse el diseño conceptual y metodológico de un sistema de monitoreo y control de drones que fortalezca la defensa integral, la capacidad de disuasión militar y la innovación tecnológica híbrida en el contexto venezolano?',
+}
+
 export const RAICES = [
-  { h: 'Acceso restringido', p: 'Restricciones comerciales y presupuestarias a plataformas avanzadas.' },
-  { h: 'Sin software soberano', p: 'Falta desarrollo propio y auditable para arquitecturas distribuidas.' },
-  { h: 'Baja resiliencia', p: 'Los sistemas convencionales fallan ante interferencia o caída de enlaces.' },
-  { h: 'Sin control descentralizado', p: 'Sin consenso ni autonomía, la misión depende de un punto único.' },
+  { h: 'Acceso restringido', p: 'Restricciones comerciales, presupuestarias y tecnológicas dificultan el acceso a plataformas avanzadas de monitoreo y control.' },
+  { h: 'Sin software soberano', p: 'Carencia de desarrollo propio orientado a arquitecturas distribuidas que respondan a las necesidades del contexto venezolano.' },
+  { h: 'Baja resiliencia', p: 'Los sistemas convencionales fallan ante interferencias electromagnéticas, pérdida de nodos o interrupciones en los enlaces de datos.' },
+  { h: 'Sin control descentralizado', p: 'Las unidades operan de forma vulnerable y se compromete la continuidad de misiones de vigilancia, reconocimiento o defensa.' },
 ]
 
 export const OBJETIVO_GENERAL =
-  'Diseñar conceptual y metodológicamente un sistema de monitoreo y control de drones para el contexto venezolano, enfocado en la defensa integral, la disuasión y la innovación híbrida.'
+  'Diseñar conceptual y metodológicamente un sistema de monitoreo y control de drones articulado para el contexto venezolano, enfocado en el fortalecimiento de la defensa integral, la capacidad de disuasión militar y el fomento de la innovación tecnológica híbrida.'
 
+/* Objetivos específicos con la interrogante secundaria que responde cada uno. */
 export const OBJETIVOS = [
-  { h: 'Requerimientos operacionales', p: 'Determinar las especificaciones críticas del sistema.' },
-  { h: 'Arquitectura SOA y gemelos digitales', p: 'Diseñar una arquitectura orientada a servicios para simular y controlar enjambres en tiempo real.' },
-  { h: 'Control descentralizado y consenso', p: 'Formular el modelo y los algoritmos que garantizan autonomía y resiliencia ante pérdida de nodos o interferencia.' },
+  {
+    v: 'Analizar',
+    h: 'los requerimientos operacionales',
+    p: 'para determinar las especificaciones críticas del sistema de monitoreo y control.',
+    q: '¿Cuáles son los requerimientos operacionales que definen las especificaciones críticas del sistema?',
+  },
+  {
+    v: 'Desarrollar',
+    h: 'una arquitectura de software orientada a servicios (SOA) y basada en gemelos digitales',
+    p: 'que permita la simulación, supervisión y control de enjambres de drones en tiempo real.',
+    q: '¿Qué características debe poseer una arquitectura SOA basada en gemelos digitales para simular, supervisar y controlar enjambres en tiempo real?',
+  },
+  {
+    v: 'Formular',
+    h: 'un modelo de control descentralizado y algoritmos de consenso',
+    p: 'que garanticen la autonomía y la resiliencia del enjambre ante la pérdida de nodos de comunicación o interferencia electromagnética activa.',
+    q: '¿Cómo se debe estructurar un modelo de control descentralizado y algoritmos de consenso que garanticen la autonomía y resiliencia del enjambre?',
+  },
+]
+
+/* Alcance y limitaciones (Capítulo I). */
+export const ALCANCE = [
+  { h: 'Sin hardware', p: 'Diseño conceptual, arquitectura de software y simulación virtual. No hay prototipos físicos ni pruebas de vuelo.' },
+  { h: 'Interferencia simulada', p: 'La resiliencia se valida con inyección de fallos controlados en el simulador, no con inhibidores reales.' },
+  { h: 'Datos sintéticos', p: 'Telemetría y datos topográficos generados de forma sintética o de código abierto. Nada clasificado, ninguna frecuencia real.' },
 ]
 
 /* Capturas reales del simulador (WebP, con variante móvil -m). */
