@@ -1,0 +1,14 @@
+{
+  "name": "simcodve-folleto",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tríptico impreso para la defensa de la tesis SIMCODVE (HTML/CSS -> PDF con Chrome).",
+  "scripts": {
+    "pdf": "node generar.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.0.0",
+    "qrcode-generator": "^2.0.4"
+  }
+}

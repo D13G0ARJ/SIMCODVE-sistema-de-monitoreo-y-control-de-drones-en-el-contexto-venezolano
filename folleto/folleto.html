@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Folleto SIMCODVE</title>
+<style>
+/* ------------------------------------------------------------------
+   Tríptico carta apaisado (11 x 8,5 in), dos caras, tres paneles por cara.
+   Cara exterior: [solapa interior | contraportada | portada]
+   Cara interior: [el problema | objetivos y método | sistema y resultados]
+   Impresión: doble cara, voltear por el borde corto, papel 150 a 200 g.
+   Tinta azul marino sobre blanco; solo la portada es oscura.
+   Un acento (cian) y las mismas fuentes de la landing: Sora y Manrope.
+------------------------------------------------------------------- */
+@font-face { font-family: 'Sora'; src: url('fuentes/sora.woff2') format('woff2-variations'); font-weight: 100 800; font-display: block; }
+@font-face { font-family: 'Manrope'; src: url('fuentes/manrope.woff2') format('woff2-variations'); font-weight: 200 800; font-display: block; }
+
+:root {
+  --tinta: #0B1730;
+  --tinta2: #3F4C61;
+  --tinta3: #6B7890;
+  --linea: #D3D9E3;
+  --suave: #F2F5F9;
+  --acento: #0E9FBF;          /* cian oscurecido: imprime bien sobre blanco */
+  --acento-luz: #22D3EE;      /* cian de pantalla: solo sobre la portada oscura */
+  --noche: #070B14;
+  --sora: 'Sora', sans-serif;
+  --manrope: 'Manrope', sans-serif;
+  --ancho: 11in;
+  --alto: 8.5in;
+}
+
+@page { size: 11in 8.5in; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; color: var(--tinta); font: 400 8.6pt/1.42 var(--manrope); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { width: var(--ancho); }
+img { display: block; max-width: 100%; }
+p { margin: 0; }
+h1, h2, h3 { font-family: var(--sora); font-weight: 600; letter-spacing: -.015em; line-height: 1.15; text-wrap: balance; }
+h2 { font-size: 14.5pt; margin-bottom: .16in; }
+h3 { font-size: 9.6pt; margin: .2in 0 .08in; }
+.gris { color: var(--tinta2); }
+.peq { font-size: 7.4pt; color: var(--tinta3); }
+.lead { font-size: 9.2pt; line-height: 1.45; }
+.acento { color: var(--acento); }
+strong { font-weight: 600; }
+
+/* Hojas y paneles */
+.hoja { width: var(--ancho); height: var(--alto); position: relative; display: grid; grid-template-columns: repeat(3, 1fr); overflow: hidden; page-break-after: always; break-after: page; }
+.hoja:last-child { page-break-after: auto; break-after: auto; }
+.panel { position: relative; padding: .42in .38in .4in; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+/* Marcas de plegado: ticks fuera del área de contenido */
+.marca { position: absolute; top: 0; width: 0; height: .14in; border-left: .5pt solid #9AA3B2; }
+.marca.abajo { top: auto; bottom: 0; }
+.marca.a { left: calc(100% / 3); } .marca.b { left: calc(200% / 3); }
+
+/* ---------- Portada ---------- */
+.portada { background: var(--noche); color: #E6EDF7; padding: .42in .4in .42in; }
+.portada .inst { display: flex; gap: .12in; align-items: center; }
+.portada .inst img { width: .56in; height: auto; background: #fff; padding: .04in; border-radius: .06in; }
+.portada .inst p { font-size: 6.6pt; line-height: 1.3; color: #A7B6CC; letter-spacing: .01em; }
+.portada .enjambre { margin: .05in -.4in 0; height: 2.9in; }
+.portada .enjambre svg { width: 100%; height: 100%; display: block; }
+.portada .teg { font: 500 7.6pt/1 var(--manrope); letter-spacing: .06em; color: var(--acento-luz); text-transform: uppercase; margin-top: .1in; }
+.portada h1 { font-size: 19pt; margin-top: .1in; letter-spacing: -.02em; }
+.portada .sub { color: #A7B6CC; font-size: 8.8pt; margin-top: .12in; max-width: 30ch; }
+.portada .pie { margin-top: auto; padding-top: .2in; border-top: .5pt solid rgba(140,160,184,.35); display: grid; gap: .04in; font-size: 7.8pt; color: #A7B6CC; }
+.portada .pie b { color: #E6EDF7; font-weight: 600; }
+.portada .marca-simcodve { font: 700 11pt/1 var(--sora); color: #E6EDF7; letter-spacing: .02em; }
+
+/* ---------- Contraportada (QR) ---------- */
+.qr-panel { align-items: stretch; }
+.qr-caja { margin-top: .14in; padding: .2in .2in .16in; border: 1pt solid var(--acento); border-radius: .12in; display: grid; justify-items: center; gap: .12in; text-align: center; }
+.qr-caja svg { width: 1.85in; height: 1.85in; display: block; }
+.qr-caja .como { font-size: 7.9pt; line-height: 1.4; max-width: 2.5in; }
+.qr-caja .como b { display: block; font: 600 10pt/1.2 var(--sora); margin-bottom: .04in; }
+.qr-caja .url { display: block; margin-top: .06in; font: 600 8pt/1.3 var(--manrope); color: var(--acento); }
+.lista-landing { list-style: none; margin-top: .08in; display: grid; gap: .06in; }
+.lista-landing li { padding-left: .16in; position: relative; }
+.lista-landing li::before { content: ''; position: absolute; left: 0; top: .075in; width: .07in; height: .07in; border-radius: 50%; background: var(--acento); }
+.creditos { margin-top: auto; padding-top: .16in; border-top: .5pt solid var(--linea); display: grid; gap: .1in; }
+.creditos .fila { display: grid; grid-template-columns: .72in 1fr; gap: .1in; font-size: 7.8pt; }
+.creditos .fila span:first-child { color: var(--tinta3); }
+.aviso { margin-top: .12in; padding: .1in .12in; background: var(--suave); border-radius: .08in; font-size: 7pt; line-height: 1.4; color: var(--tinta2); }
+
+/* ---------- Solapa: qué es ---------- */
+.check { list-style: none; display: grid; gap: .055in; margin-top: .04in; }
+.check li { display: grid; grid-template-columns: .15in 1fr; gap: .06in; align-items: start; font-size: 8.1pt; line-height: 1.35; }
+.check li::before { content: ''; width: .1in; height: .1in; margin-top: .035in; border-radius: .02in; background: var(--acento); }
+.stack { margin-top: .16in; padding-top: .14in; border-top: .5pt solid var(--linea); }
+.stack p { font-size: 8pt; }
+.stack .titulos { display: grid; grid-template-columns: 1fr 1fr; gap: .1in; margin-top: .06in; font-size: 7.6pt; }
+.stack .titulos b { display: block; font-family: var(--sora); font-weight: 600; font-size: 7.8pt; margin-bottom: .02in; }
+
+/* ---------- Interior ---------- */
+.raices { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .1in .14in; margin-top: .02in; }
+.raices li { border-top: 1pt solid var(--tinta); padding-top: .06in; }
+.raices b { display: block; font: 600 8.2pt/1.25 var(--sora); margin-bottom: .03in; }
+.raices span { font-size: 7.5pt; line-height: 1.35; color: var(--tinta2); }
+.interrogante { margin-top: .18in; padding: .12in .14in; background: var(--suave); border-left: 1.5pt solid var(--acento); border-radius: 0 .08in .08in 0; }
+.interrogante .et { font: 500 6.8pt/1 var(--manrope); letter-spacing: .06em; text-transform: uppercase; color: var(--acento); margin-bottom: .06in; }
+.interrogante p { font: 500 8.6pt/1.38 var(--sora); letter-spacing: -.01em; }
+
+.general { font: 500 9.4pt/1.38 var(--sora); letter-spacing: -.01em; }
+.especificos { list-style: none; display: grid; gap: .08in; margin-top: .06in; }
+.especificos li { padding-top: .07in; border-top: .5pt solid var(--linea); font-size: 7.9pt; line-height: 1.38; }
+.especificos b { color: var(--acento); font-weight: 700; }
+.fases { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: .06in; margin-top: .06in; position: relative; padding-top: .14in; }
+.fases::before { content: ''; position: absolute; left: .05in; right: .05in; top: .05in; height: .5pt; background: var(--tinta); }
+.fases li { position: relative; font: 600 6.9pt/1.25 var(--sora); padding-right: .04in; }
+.fases li::before { content: ''; position: absolute; left: .02in; top: -.13in; width: .08in; height: .08in; border-radius: 50%; background: #fff; border: 1pt solid var(--tinta); }
+.limites { list-style: none; display: grid; gap: .05in; margin-top: .04in; }
+.limites li { font-size: 7.5pt; line-height: 1.35; color: var(--tinta2); }
+.limites b { color: var(--tinta); font-weight: 600; }
+
+.figura { margin: 0; }
+.figura img { width: 100%; aspect-ratio: 1090 / 865; object-fit: cover; border-radius: .08in; border: .5pt solid var(--linea); }
+.figura figcaption { font-size: 7.2pt; line-height: 1.3; color: var(--tinta2); margin-top: .05in; }
+.figuras { display: grid; grid-template-columns: 1fr 1fr; gap: .12in; margin-top: .02in; }
+.cien { display: grid; grid-template-columns: auto 1fr; gap: .14in; align-items: center; margin-top: .04in; }
+.cien .num { font: 600 30pt/1 var(--sora); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.cien p { font-size: 7.9pt; line-height: 1.35; }
+.tabla { width: 100%; border-collapse: collapse; margin-top: .1in; font-size: 7.6pt; }
+.tabla td { padding: .045in 0; border-top: .5pt solid var(--linea); vertical-align: top; }
+.tabla td:last-child { text-align: right; font: 600 8pt/1.3 var(--sora); font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: .1in; }
+.tabla tr:last-child td { border-bottom: 1pt solid var(--tinta); }
+</style>
+</head>
+<body>
+
+<!-- ======================= CARA EXTERIOR ======================= -->
+<section class="hoja">
+  <span class="marca a"></span><span class="marca b"></span><span class="marca a abajo"></span><span class="marca b abajo"></span>
+
+  <!-- Solapa interior: qué es SIMCODVE -->
+  <article class="panel">
+    <h2>¿Qué es SIMCODVE?</h2>
+    <p class="lead">Un prototipo académico de software que simula enjambres de drones sobre el mapa satelital real de Venezuela. Cada unidad decide con sus vecinos, sin un controlador central, y el enjambre sigue operando cuando se pierden nodos o aparece interferencia.</p>
+    <p class="gris" style="margin-top:.1in">Es la materialización del diseño conceptual y metodológico propuesto en la tesis: una arquitectura orientada a servicios (SOA), gemelos digitales de cada unidad y un modelo de control descentralizado con algoritmos de consenso.</p>
+
+    <h3>Ocho capacidades del prototipo</h3>
+    <ul class="check">
+      <li>Despliegue de enjambres sobre mapa satelital real</li>
+      <li>Telemetría y gemelo digital de cada unidad: posición, velocidad, altitud y batería</li>
+      <li>Modos de operación patrullaje, defensa e híbrido</li>
+      <li>Inyección de fallos y zonas de interferencia (jamming)</li>
+      <li>Consumo de batería y retorno automático a base</li>
+      <li>Alertas clasificadas por tipo y severidad</li>
+      <li>Métricas de resiliencia exportables: conectividad, cobertura, coherencia y tiempo de recuperación</li>
+      <li>Pausa, reanudación y escenarios reproducibles con semilla</li>
+    </ul>
+
+    <div class="stack">
+      <p><strong>Construido con software libre.</strong> Sin cajas negras ni dependencia del exterior; corre en un equipo convencional desde el navegador.</p>
+      <div class="titulos">
+        <div><b>Interfaz</b>React, Vite y Leaflet con imágenes satelitales Esri</div>
+        <div><b>Servidor</b>Python, FastAPI y WebSocket de telemetría a 10 Hz</div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Contraportada: QR -->
+  <article class="panel qr-panel">
+    <h2>Explora más en la landing</h2>
+    <p class="gris">Toda la tesis en tu celular: el enjambre en movimiento, las pantallas del simulador y el documento completo.</p>
+    <div class="qr-caja">
+      <div id="qr" role="img" aria-label="Código QR de la landing"></div>
+      <div class="como">
+        <b>Escanea con la cámara</b>
+        Apunta el celular al código y toca el enlace que aparece. No necesitas ninguna aplicación.
+        <span class="url" id="url-texto"></span>
+      </div>
+    </div>
+    <ul class="lista-landing">
+      <li>Historia del enjambre: patrullaje, defensa, interferencia y recuperación</li>
+      <li>Capturas reales del simulador y sus capacidades</li>
+      <li>Resultados de la validación por expertos</li>
+      <li>Tesis completa en PDF y repositorio del código</li>
+    </ul>
+
+    <div class="creditos">
+      <div class="fila"><span>Autores</span><span><strong>Diego Rodríguez</strong> · github.com/D13G0ARJ<br><strong>Yoneiker Azocar</strong> · github.com/AlexanderAzocar</span></div>
+      <div class="fila"><span>Tutor</span><span>Rodolfo Caccamo</span></div>
+      <div class="fila"><span>Institución</span><span>UNEFA, Núcleo Altos Mirandinos. Los Teques, junio 2026</span></div>
+      <div class="fila"><span>Título</span><span>Ingeniero de Sistemas</span></div>
+    </div>
+    <p class="aviso">Prototipo académico con datos 100 % sintéticos. No emplea drones físicos, frecuencias operativas reales ni información clasificada.</p>
+  </article>
+
+  <!-- Portada -->
+  <article class="panel portada">
+    <div class="inst">
+      <img src="img/unefa.png" alt="Escudo de la UNEFA">
+      <p>Universidad Nacional Experimental Politécnica de la Fuerza Armada Nacional Bolivariana<br>Núcleo Altos Mirandinos · Ingeniería de Sistemas</p>
+    </div>
+    <div class="enjambre" id="enjambre" aria-hidden="true"></div>
+    <p class="teg">Trabajo Especial de Grado</p>
+    <h1>Diseño de un Sistema de Monitoreo y Control de Drones en el Contexto Venezolano</h1>
+    <p class="sub">Un enfoque tecnológico para la defensa, disuasión e innovación híbrida.</p>
+    <div class="pie">
+      <span class="marca-simcodve">SIMCODVE</span>
+      <span><b>Diego Rodríguez</b> y <b>Yoneiker Azocar</b></span>
+      <span>Tutor: Rodolfo Caccamo · Los Teques, junio 2026</span>
+    </div>
+  </article>
+</section>
+
+<!-- ======================= CARA INTERIOR ======================= -->
+<section class="hoja">
+  <span class="marca a"></span><span class="marca b"></span><span class="marca a abajo"></span><span class="marca b abajo"></span>
+
+  <!-- El problema -->
+  <article class="panel">
+    <h2>El problema</h2>
+    <p class="lead">Los drones y las operaciones en enjambre transformaron la doctrina de defensa, vigilancia y disuasión. El desafío ya no está solo en el hardware, sino en arquitecturas de monitoreo y control capaces de gestionar muchas unidades a la vez y de seguir operando ante ataques cibernéticos, fallas de comunicación o guerra electrónica.</p>
+    <p class="gris" style="margin-top:.1in">En Venezuela el uso de plataformas no tripuladas sigue limitado por esquemas fragmentados, enlaces punto a punto donde un operador controla un solo vehículo, y software comercial cerrado que no está hecho para enjambres en red ni para el entorno topográfico y radioeléctrico nacional.</p>
+
+    <h3>Cuatro raíces</h3>
+    <ul class="raices">
+      <li><b>Acceso restringido</b><span>Restricciones comerciales, presupuestarias y tecnológicas a plataformas avanzadas.</span></li>
+      <li><b>Sin software soberano</b><span>Carencia de desarrollo propio para arquitecturas distribuidas adaptadas al país.</span></li>
+      <li><b>Baja resiliencia</b><span>Los sistemas convencionales fallan ante interferencia, pérdida de nodos o cortes del enlace.</span></li>
+      <li><b>Sin control descentralizado</b><span>Las unidades operan vulnerables y se compromete la continuidad de la misión.</span></li>
+    </ul>
+
+    <div class="interrogante">
+      <p class="et">Interrogante principal</p>
+      <p>¿Cómo debe estructurarse el diseño conceptual y metodológico de un sistema de monitoreo y control de drones que fortalezca la defensa integral, la capacidad de disuasión militar y la innovación tecnológica híbrida en el contexto venezolano?</p>
+    </div>
+  </article>
+
+  <!-- Objetivos, metodología, alcance -->
+  <article class="panel">
+    <h2>Objetivos</h2>
+    <p class="general">Diseñar conceptual y metodológicamente un sistema de monitoreo y control de drones articulado para el contexto venezolano, enfocado en el fortalecimiento de la defensa integral, la capacidad de disuasión militar y el fomento de la innovación tecnológica híbrida.</p>
+    <ol class="especificos">
+      <li><b>Analizar</b> los requerimientos operacionales para determinar las especificaciones críticas del sistema de monitoreo y control.</li>
+      <li><b>Desarrollar</b> una arquitectura de software orientada a servicios (SOA) y basada en gemelos digitales que permita la simulación, supervisión y control de enjambres de drones en tiempo real.</li>
+      <li><b>Formular</b> un modelo de control descentralizado y algoritmos de consenso que garanticen la autonomía y la resiliencia del enjambre ante la pérdida de nodos de comunicación o interferencia electromagnética activa.</li>
+    </ol>
+
+    <h3>Metodología</h3>
+    <p class="gris" style="font-size:7.8pt">Proyecto factible, de enfoque cuantitativo, aplicado y tecnológico-proyectivo. Prototipo construido con Desarrollo Rápido de Aplicaciones (RAD) en cuatro fases.</p>
+    <ol class="fases">
+      <li>Requerimientos</li>
+      <li>Diseño con el usuario</li>
+      <li>Construcción rápida</li>
+      <li>Transición y validación</li>
+    </ol>
+
+    <h3>Alcance y límites</h3>
+    <ul class="limites">
+      <li><b>Sin hardware.</b> Diseño conceptual, arquitectura de software y simulación virtual. No hay prototipos físicos ni pruebas de vuelo.</li>
+      <li><b>Interferencia simulada.</b> La resiliencia se valida con inyección de fallos controlados, no con inhibidores reales.</li>
+      <li><b>Datos sintéticos.</b> Telemetría y topografía generadas de forma sintética o de código abierto. Nada clasificado.</li>
+    </ul>
+  </article>
+
+  <!-- El sistema y resultados -->
+  <article class="panel">
+    <h2>El sistema en acción</h2>
+    <div class="figuras">
+      <figure class="figura">
+        <img src="img/g04_mapa_enjambres.png" alt="Mapa táctico con tres enjambres sobre Los Teques">
+        <figcaption><strong>Mapa táctico.</strong> Tres enjambres desplegados sobre imágenes satelitales de Los Teques, con sus zonas asignadas y enlaces de malla.</figcaption>
+      </figure>
+      <figure class="figura">
+        <img src="img/g10_radar.png" alt="Vista de radar con anillos de distancia">
+        <figcaption><strong>Vista de radar.</strong> Barrido en vivo con anillos de distancia, trayectorias y la zona protegida en modo defensa.</figcaption>
+      </figure>
+      <figure class="figura">
+        <img src="img/g11_interferencia.png" alt="Zona de interferencia sobre el mapa">
+        <figcaption><strong>Interferencia.</strong> Una zona de guerra electrónica degrada los nodos internos; el resto de la malla enruta y la misión continúa.</figcaption>
+      </figure>
+      <figure class="figura">
+        <img src="img/g09_modo_defensa.png" alt="Enjambre en modo defensa">
+        <figcaption><strong>Modo defensa.</strong> Perímetro estático alrededor del objetivo, reordenado por consenso entre vecinos.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Validación por expertos</h3>
+    <div class="cien">
+      <span class="num">100&nbsp;%</span>
+      <p>de aceptación en necesidad, formación y soberanía tecnológica. Encuesta Likert a <strong>12 especialistas</strong> de la UNEFA; 8 de 12 ítems con aprobación unánime.</p>
+    </div>
+    <table class="tabla">
+      <tr><td>Necesidad del prototipo académico</td><td>100 %</td></tr>
+      <tr><td>Contribución a la formación tecnológica</td><td>100 %</td></tr>
+      <tr><td>Aporte a la soberanía tecnológica</td><td>100 %</td></tr>
+      <tr><td>Utilidad de la interfaz tipo radar</td><td>100 %</td></tr>
+      <tr><td>Ventajas de la arquitectura modular</td><td>100 %</td></tr>
+      <tr><td>Relación con la defensa integral</td><td>91,67 %</td></tr>
+      <tr><td>Adecuación de los datos sintéticos</td><td>91,67 %</td></tr>
+    </table>
+  </article>
+</section>
+
+<script src="node_modules/qrcode-generator/dist/qrcode.js"></script>
+<script>
+(function () {
+  /* URL de la landing: ?url=... (la pasa generar.mjs). */
+  var params = new URLSearchParams(location.search)
+  var url = params.get('url') || 'https://simcodve.vercel.app'
+  document.getElementById('url-texto').textContent = url.replace(/^https?:\/\//, '')
+  try {
+    var q = qrcode(0, 'M'); q.addData(url); q.make()
+    document.getElementById('qr').innerHTML = q.createSvgTag({ scalable: true, margin: 0 })
+  } catch (e) { document.getElementById('qr').textContent = url }
+
+  /* Enjambre de la portada: anillo en perspectiva con malla, determinista (misma semilla que la landing). */
+  var semilla = 20260621
+  function azar () {
+    semilla |= 0; semilla = (semilla + 0x6D2B79F5) | 0
+    var t = Math.imul(semilla ^ (semilla >>> 15), 1 | semilla)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  var W = 360, H = 250, N = 54, cx = W / 2, cy = H / 2 + 6
+  var pts = []
+  for (var i = 0; i < N; i++) {
+    var interno = i % 3 === 2
+    var a = (i / N) * Math.PI * 2 + (azar() - .5) * .12
+    var r = interno ? .42 : (0.86 + (azar() - .5) * .08)
+    var x = Math.cos(a) * r, z = Math.sin(a) * r, y = (azar() - .5) * .16
+    /* inclinación de 0,75 rad y perspectiva sencilla */
+    var y2 = y * Math.cos(.75) - z * Math.sin(.75), z2 = y * Math.sin(.75) + z * Math.cos(.75)
+    var s = 1 / (2.6 - z2)
+    pts.push({ x: cx + x * 150 * s * 2.2, y: cy - y2 * 150 * s * 2.2, s: s, b: .6 + azar() * .4 })
+  }
+  var lineas = '', nodos = ''
+  for (i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
+    var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy)
+    if (d < 46) lineas += '<line x1="' + pts[i].x.toFixed(1) + '" y1="' + pts[i].y.toFixed(1) + '" x2="' + pts[j].x.toFixed(1) + '" y2="' + pts[j].y.toFixed(1) + '" stroke-opacity="' + (0.55 * (1 - d / 46)).toFixed(2) + '"/>'
+  }
+  for (i = 0; i < N; i++) {
+    var rr = 2.2 + pts[i].s * 3.2
+    nodos += '<circle cx="' + pts[i].x.toFixed(1) + '" cy="' + pts[i].y.toFixed(1) + '" r="' + (rr * 2.6).toFixed(1) + '" fill="url(#halo)" opacity="' + (pts[i].b * .9).toFixed(2) + '"/>'
+    nodos += '<circle cx="' + pts[i].x.toFixed(1) + '" cy="' + pts[i].y.toFixed(1) + '" r="' + rr.toFixed(1) + '" fill="#E6FDFF" opacity="' + pts[i].b.toFixed(2) + '"/>'
+  }
+  document.getElementById('enjambre').innerHTML =
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs><radialGradient id="halo"><stop offset="0" stop-color="#22D3EE" stop-opacity=".9"/><stop offset=".45" stop-color="#22D3EE" stop-opacity=".35"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient></defs>' +
+    '<g stroke="#22D3EE" stroke-width=".7">' + lineas + '</g>' + nodos + '</svg>'
+
+  window.__listo = true
+})()
+</script>
+</body>
+</html>

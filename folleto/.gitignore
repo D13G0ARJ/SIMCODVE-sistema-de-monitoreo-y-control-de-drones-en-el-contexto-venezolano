@@ -1,0 +1,5 @@
+node_modules/
+# Las vistas previas PNG se regeneran con `node generar.mjs`; los PDF sí se versionan
+# porque son el material que se imprime (el .gitignore raíz ignora *.pdf en general).
+salida/*.png
+!salida/*.pdf

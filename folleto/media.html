@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Media hoja SIMCODVE</title>
+<style>
+/* ------------------------------------------------------------------
+   Volante de media carta (8,5 x 5,5 in). La página carta vertical trae
+   dos copias iguales con una línea de corte en el medio.
+   Panel oscuro con el título a la izquierda, texto breve en el centro
+   y el QR a la derecha. Mismas fuentes y colores de la landing.
+------------------------------------------------------------------- */
+@font-face { font-family: 'Sora'; src: url('fuentes/sora.woff2') format('woff2-variations'); font-weight: 100 800; font-display: block; }
+@font-face { font-family: 'Manrope'; src: url('fuentes/manrope.woff2') format('woff2-variations'); font-weight: 200 800; font-display: block; }
+
+:root {
+  --tinta: #0B1730; --tinta2: #3F4C61; --tinta3: #6B7890;
+  --linea: #D3D9E3; --suave: #F2F5F9;
+  --acento: #0E9FBF; --acento-luz: #22D3EE; --noche: #070B14;
+  --sora: 'Sora', sans-serif; --manrope: 'Manrope', sans-serif;
+}
+@page { size: 8.5in 11in; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; color: var(--tinta); font: 400 8pt/1.4 var(--manrope); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+img { display: block; max-width: 100%; }
+h1, h2, h3 { font-family: var(--sora); font-weight: 600; letter-spacing: -.015em; line-height: 1.15; text-wrap: balance; }
+strong { font-weight: 600; }
+
+.hoja { width: 8.5in; height: 11in; position: relative; overflow: hidden; display: grid; grid-template-rows: 5.5in 5.5in; }
+.corte { position: absolute; left: .25in; right: .25in; top: 5.5in; border-top: .5pt dashed #9AA3B2; }
+.corte::before, .corte::after { content: ''; position: absolute; top: -.1in; width: 0; height: .2in; border-left: .5pt solid #9AA3B2; }
+.corte::before { left: -.25in; } .corte::after { right: -.25in; }
+
+.volante { display: grid; grid-template-columns: 3in 1fr 1.75in; height: 5.5in; overflow: hidden; }
+
+/* Panel oscuro */
+.oscuro { background: var(--noche); color: #E6EDF7; padding: .34in .32in .3in; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.oscuro .inst { display: flex; gap: .09in; align-items: center; }
+.oscuro .inst img { width: .4in; background: #fff; padding: .03in; border-radius: .04in; }
+.oscuro .inst p { font-size: 5.9pt; line-height: 1.3; color: #A7B6CC; }
+.oscuro .teg { font: 500 6.4pt/1 var(--manrope); letter-spacing: .07em; text-transform: uppercase; color: var(--acento-luz); margin-top: .22in; }
+.oscuro h1 { font-size: 14pt; margin-top: .07in; letter-spacing: -.02em; }
+.oscuro .sub { color: #A7B6CC; font-size: 7.2pt; margin-top: .08in; line-height: 1.35; }
+.oscuro .pie { margin-top: auto; font-size: 7pt; line-height: 1.4; color: #A7B6CC; position: relative; }
+.oscuro .pie b { color: #E6EDF7; font-weight: 600; }
+.oscuro .enjambre { position: absolute; left: 50%; top: 2.55in; transform: translateX(-50%); width: 2.5in; height: 1.9in; opacity: .9; }
+.oscuro .enjambre svg { width: 100%; height: 100%; display: block; }
+
+/* Centro */
+.centro { padding: .34in .3in .3in .34in; display: flex; flex-direction: column; }
+.centro h2 { font-size: 11pt; margin-bottom: .06in; }
+.centro .lead { font-size: 8pt; line-height: 1.42; }
+.claves { list-style: none; margin-top: .14in; display: grid; gap: .075in; }
+.claves li { display: grid; grid-template-columns: .12in 1fr; gap: .07in; font-size: 7.6pt; line-height: 1.36; color: var(--tinta2); }
+.claves li::before { content: ''; width: .09in; height: .09in; margin-top: .04in; border-radius: .015in; background: var(--acento); }
+.claves b { color: var(--tinta); font-weight: 600; }
+.figura { margin: .14in 0 0; }
+.figura img { width: 100%; aspect-ratio: 1090 / 500; object-fit: cover; object-position: center 40%; border-radius: .07in; border: .5pt solid var(--linea); }
+.figura figcaption { font-size: 6.8pt; line-height: 1.32; color: var(--tinta2); margin-top: .045in; }
+.cien { margin-top: auto; padding-top: .1in; border-top: .5pt solid var(--linea); display: grid; grid-template-columns: auto 1fr; gap: .1in; align-items: center; }
+.cien .num { font: 600 20pt/1 var(--sora); letter-spacing: -.04em; }
+.cien p { font-size: 7pt; line-height: 1.34; color: var(--tinta2); }
+.cien b { color: var(--tinta); font-weight: 600; }
+
+/* QR */
+.qr { background: var(--suave); padding: .34in .24in .3in; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.qr svg { width: 1.35in; height: 1.35in; display: block; background: #fff; padding: .06in; border-radius: .06in; }
+.qr b { display: block; font: 600 8.6pt/1.2 var(--sora); margin-top: .14in; }
+.qr p { font-size: 7pt; line-height: 1.38; color: var(--tinta2); margin-top: .06in; }
+.qr .url { display: block; margin-top: .08in; font: 700 7.6pt/1.3 var(--manrope); color: var(--acento); word-break: break-all; }
+.qr .pasos { list-style: none; margin-top: .14in; text-align: left; display: grid; gap: .05in; font-size: 6.6pt; line-height: 1.35; color: var(--tinta2); }
+.qr .pasos li { padding-left: .11in; position: relative; }
+.qr .pasos li::before { content: ''; position: absolute; left: 0; top: .06in; width: .05in; height: .05in; border-radius: 50%; background: var(--acento); }
+.qr .aviso { margin-top: auto; font-size: 6pt; line-height: 1.35; color: var(--tinta3); }
+</style>
+</head>
+<body>
+<section class="hoja">
+  <span class="corte" aria-hidden="true"></span>
+
+  <template id="plantilla">
+    <article class="volante">
+      <div class="oscuro">
+        <div class="inst">
+          <img src="img/unefa.png" alt="Escudo de la UNEFA">
+          <p>Universidad Nacional Experimental Politécnica de la Fuerza Armada Nacional Bolivariana<br>Núcleo Altos Mirandinos · Ingeniería de Sistemas</p>
+        </div>
+        <p class="teg">Trabajo Especial de Grado</p>
+        <h1>Diseño de un Sistema de Monitoreo y Control de Drones en el Contexto Venezolano</h1>
+        <p class="sub">Un enfoque tecnológico para la defensa, disuasión e innovación híbrida. Prototipo SIMCODVE.</p>
+        <div class="enjambre" data-enjambre aria-hidden="true"></div>
+        <p class="pie"><b>Diego Rodríguez</b> y <b>Yoneiker Azocar</b><br>Tutor: Rodolfo Caccamo<br>Los Teques, junio 2026</p>
+      </div>
+
+      <div class="centro">
+        <h2>¿Qué es SIMCODVE?</h2>
+        <p class="lead">Un prototipo académico de software que simula enjambres de drones sobre el mapa satelital real de Venezuela. Cada unidad decide con sus vecinos, sin controlador central, y el enjambre sigue operando cuando se pierden nodos o aparece interferencia.</p>
+        <ul class="claves">
+          <li><span><b>Control descentralizado y consenso.</b> Sin líder ni punto único de falla.</span></li>
+          <li><span><b>Arquitectura SOA y gemelos digitales.</b> Telemetría de cada unidad en tiempo real.</span></li>
+          <li><span><b>Resiliencia medida.</b> Inyección de fallos e interferencia con métricas exportables.</span></li>
+          <li><span><b>Software libre y soberano.</b> React, Leaflet, Python y FastAPI. Datos 100 % sintéticos.</span></li>
+        </ul>
+        <figure class="figura">
+          <img src="img/g11_interferencia.png" alt="Mapa táctico con enjambres y zona de interferencia">
+          <figcaption><strong>Mapa táctico.</strong> Enjambres sobre imágenes satelitales de Los Teques; la zona roja de interferencia degrada nodos y la malla sigue operando.</figcaption>
+        </figure>
+        <div class="cien">
+          <span class="num">100&nbsp;%</span>
+          <p><b>de aceptación</b> en necesidad, formación y soberanía tecnológica. Encuesta a 12 especialistas de la UNEFA.</p>
+        </div>
+      </div>
+
+      <div class="qr">
+        <div data-qr role="img" aria-label="Código QR de la landing"></div>
+        <b>Escanea y explora la tesis</b>
+        <p>El enjambre en movimiento, el simulador en acción y el PDF completo, en tu celular.</p>
+        <span class="url" data-url></span>
+        <ul class="pasos">
+          <li>Historia del enjambre: patrullaje, defensa, interferencia y recuperación</li>
+          <li>Capturas del simulador y resultados</li>
+          <li>Tesis en PDF y código fuente</li>
+        </ul>
+        <p class="aviso">Prototipo académico. Sin drones físicos, sin frecuencias reales, sin información clasificada.</p>
+      </div>
+    </article>
+  </template>
+</section>
+
+<script src="node_modules/qrcode-generator/dist/qrcode.js"></script>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search)
+  var url = params.get('url') || 'https://simcodve.vercel.app'
+  var qrSvg = ''
+  try { var q = qrcode(0, 'M'); q.addData(url); q.make(); qrSvg = q.createSvgTag({ scalable: true, margin: 0 }) } catch (e) { qrSvg = url }
+
+  /* Enjambre determinista (misma semilla que la landing). */
+  var semilla = 20260621
+  function azar () {
+    semilla |= 0; semilla = (semilla + 0x6D2B79F5) | 0
+    var t = Math.imul(semilla ^ (semilla >>> 15), 1 | semilla)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  var W = 300, H = 230, N = 48, cx = W / 2, cy = H / 2
+  var pts = []
+  for (var i = 0; i < N; i++) {
+    var interno = i % 3 === 2
+    var a = (i / N) * Math.PI * 2 + (azar() - .5) * .12
+    var r = interno ? .42 : (0.86 + (azar() - .5) * .08)
+    var x = Math.cos(a) * r, z = Math.sin(a) * r, y = (azar() - .5) * .16
+    var y2 = y * Math.cos(.75) - z * Math.sin(.75), z2 = y * Math.sin(.75) + z * Math.cos(.75)
+    var s = 1 / (2.6 - z2)
+    pts.push({ x: cx + x * 150 * s * 2.05, y: cy - y2 * 150 * s * 2.05, s: s, b: .6 + azar() * .4 })
+  }
+  var lineas = '', nodos = ''
+  for (i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
+    var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy)
+    if (d < 46) lineas += '<line x1="' + pts[i].x.toFixed(1) + '" y1="' + pts[i].y.toFixed(1) + '" x2="' + pts[j].x.toFixed(1) + '" y2="' + pts[j].y.toFixed(1) + '" stroke-opacity="' + (0.55 * (1 - d / 46)).toFixed(2) + '"/>'
+  }
+  for (i = 0; i < N; i++) {
+    var rr = 2 + pts[i].s * 3
+    nodos += '<circle cx="' + pts[i].x.toFixed(1) + '" cy="' + pts[i].y.toFixed(1) + '" r="' + (rr * 2.6).toFixed(1) + '" fill="url(#halo)" opacity="' + (pts[i].b * .9).toFixed(2) + '"/>'
+    nodos += '<circle cx="' + pts[i].x.toFixed(1) + '" cy="' + pts[i].y.toFixed(1) + '" r="' + rr.toFixed(1) + '" fill="#E6FDFF" opacity="' + pts[i].b.toFixed(2) + '"/>'
+  }
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs><radialGradient id="halo"><stop offset="0" stop-color="#22D3EE" stop-opacity=".9"/><stop offset=".45" stop-color="#22D3EE" stop-opacity=".35"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient></defs>' +
+    '<g stroke="#22D3EE" stroke-width=".7">' + lineas + '</g>' + nodos + '</svg>'
+
+  /* Dos copias iguales del volante en la misma hoja. */
+  var plantilla = document.getElementById('plantilla')
+  var hoja = document.querySelector('.hoja')
+  for (var k = 0; k < 2; k++) {
+    var nodo = plantilla.content.cloneNode(true)
+    nodo.querySelector('[data-qr]').innerHTML = qrSvg
+    nodo.querySelector('[data-url]').textContent = url.replace(/^https?:\/\//, '')
+    nodo.querySelector('[data-enjambre]').innerHTML = svg
+    hoja.insertBefore(nodo, plantilla)
+  }
+  window.__listo = true
+})()
+</script>
+</body>
+</html>
